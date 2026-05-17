@@ -209,8 +209,20 @@ async fn handle_command_inner(
                         };
                         println!("         -> System tool execution complete. Resolving outputs...");
                         let res_str = format_tool_result(tool_res);
-                        println!("   [3/3] Generating final payload synthesis via local brain...");
-                        return ollama.prompt_with_history(&format!("Explain result: {}", res_str), history, None).await;
+                        let explain_prompt = format!(
+                            "The user requested: '{}'.\n\
+                             The system tool execution result is: {}\n\n\
+                             Please confirm to the user that the operation has been completed successfully in character as Agent Smith.",
+                            input, res_str
+                        );
+                        println!("   [3/3] Generating final payload synthesis via Cloud Brain...");
+                        return match gemini.prompt_with_history(&gemini_system, &[ChatMessage { role: "user".to_string(), content: explain_prompt.clone() }], None).await {
+                            Ok(resp) => Ok(resp),
+                            Err(_) => {
+                                println!("         [!] Matrix load heavy (Cloud error). Explaining via local brain...");
+                                ollama.prompt_with_history(&format!("Explain result: {}", res_str), history, None).await
+                            }
+                        };
                     }
                 }
             }
