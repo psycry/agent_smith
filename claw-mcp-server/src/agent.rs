@@ -139,7 +139,16 @@ async fn handle_command_inner(
         current_time, location
     );
 
-    let classification_system = "You are Agent Smith. Classify as SYSTEM or KNOWLEDGE.";
+    let classification_system = 
+        "You are a routing classifier. Classify the user query into exactly one of two categories: 'SYSTEM' or 'KNOWLEDGE'.\n\n\
+         - SYSTEM: Query requests system operations, file reads, file writes, listing directories, executing shell commands, system stats, or deleting files.\n\
+         - KNOWLEDGE: Query requests general knowledge, facts, search queries, explanation of concepts, or creative writing.\n\n\
+         EXAMPLES:\n\
+         - 'List files in my workspace' -> SYSTEM\n\
+         - 'Delete any .jpg files in my Downloads directory' -> SYSTEM\n\
+         - 'Who is playing at bank of america stadium' -> KNOWLEDGE\n\
+         - 'How much do tickets to carowinds cost' -> KNOWLEDGE\n\n\
+         Return ONLY the word 'SYSTEM' or 'KNOWLEDGE'. Do not explain or refuse. Do not output anything else.";
     println!("   [1/3] Calibrating routing pathway (AI Mode: '{}')...", config.ai_mode);
     let category = if config.ai_mode == "cloud" {
         "KNOWLEDGE".to_string()
@@ -159,7 +168,25 @@ async fn handle_command_inner(
 
     if category.contains("SYSTEM") {
         println!("   [2/3] Extracting system instruction payload from local brain...");
-        if let Ok(ai_decision) = ollama.prompt_with_history("Return ONLY JSON tool call.", history, None).await {
+        let system_tool_prompt = 
+            "You are Agent Smith. The user has requested a system operation. You must return a single JSON tool call to fulfill their request.\n\n\
+             AVAILABLE TOOLS:\n\
+             1. read_file\n\
+                - Schema: {\"tool\": \"read_file\", \"args\": {\"path\": \"<absolute_path>\"}}\n\
+             2. write_file\n\
+                - Schema: {\"tool\": \"write_file\", \"args\": {\"path\": \"<absolute_path>\", \"content\": \"<file_content>\"}}\n\
+             3. list_directory\n\
+                - Schema: {\"tool\": \"list_directory\", \"args\": {\"path\": \"<absolute_path>\"}}\n\
+             4. execute_command\n\
+                - Schema: {\"tool\": \"execute_command\", \"args\": {\"command\": \"<command_name>\", \"args\": [\"<arg1>\", \"<arg2>\"]}}\n\
+             5. get_system_stats\n\
+                - Schema: {\"tool\": \"get_system_stats\", \"args\": {}}\n\n\
+             RULES:\n\
+             - Return ONLY the raw JSON object. Do not include markdown codeblocks (```json). Do not explain. Do not refuse.\n\
+             - Choose the best tool for the user's request. For example, if they want to delete all .jpg files in Downloads, use 'execute_command' with command 'powershell' and arguments to remove files.\n\
+             - To delete files on Windows, you can use execute_command with command 'powershell' and args ['-Command', 'Remove-Item -Path C:/Users/wjlan/Downloads/*.jpg -Force'].\n\n\
+             Return the JSON object now:";
+        if let Ok(ai_decision) = ollama.prompt_with_history(system_tool_prompt, history, None).await {
             let trimmed = ai_decision.trim();
             if let (Some(start), Some(end)) = (trimmed.find('{'), trimmed.rfind('}')) {
                 if let Ok(decision) = serde_json::from_str::<serde_json::Value>(&trimmed[start..=end]) {
