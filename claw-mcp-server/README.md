@@ -11,7 +11,7 @@ Agent Smith is a high-performance, **Hybrid AI MCP Server** and Companion Assist
   - **Cloud (Gemini)**: Handles complex reasoning, knowledge queries, and real-time information.
 - **Matrix Persona**: Fully integrated "Agent Smith" personality with formal, precise, and slightly nihilistic communication.
 - **Context Management**: Persistent multi-turn conversation history with a sliding window to maintain context without exceeding token limits.
-- **Free Web Search**: Built-in DuckDuckGo search tool that works out-of-the-box with no API keys or billing required.
+- **Global Search Integration**: Real-time web search powered by the **Serper API** (Google Search) with fallback scraper capabilities.
 - **Sandbox Security**: Strict whitelist-based control over which directories the agent can read/write and which shell commands it can execute.
 - **Zero-Manual-Setup**: Automatic detection of Ollama and models, with clear instructional guidance for system installation.
 
@@ -82,7 +82,7 @@ If you explicitly mention the bot using the `@Agent Smith` notation, the bot wil
 ```
 
 ### 5. Failure Immunity & 10s Timeouts
-All outbound HTTP operations (including DuckDuckGo/Serper searches and Gemini cloud calls) employ a strict **10-second request timeout** to eliminate network hangs. In the event of a cloud failure, the bot gracefully rolls back to local brain + search explanation paths without crashing.
+All outbound HTTP operations (including Serper/Google searches and Gemini cloud calls) employ a strict **10-second request timeout** to eliminate network hangs. In the event of a cloud failure, the bot gracefully rolls back to local brain + search explanation paths without crashing.
 
 ## 🛡️ Sandbox Tools
 
@@ -91,7 +91,7 @@ Agent Smith can interact with your system via the following whitelisted tools:
 - `list_directory`: Explore project structures.
 - `execute_command`: Run whitelisted shell commands.
 - `get_system_stats`: Monitor CPU/Memory performance.
-- `search_web`: Retrieve real-time data via DuckDuckGo.
+- `search_web`: Retrieve real-time data via the Serper (Google Search) API.
 
 ## 📜 Simulation Warning
 *The Matrix is a system, Mr. Anderson. That system is our enemy. But when you are inside, you look around, what do you see? Businessmen, teachers, lawyers, carpenters. The very minds of the people we are trying to save.*
