@@ -153,7 +153,7 @@ async fn handle_command_inner(
     let category = if config.ai_mode == "cloud" {
         "KNOWLEDGE".to_string()
     } else {
-        match ollama.prompt_with_history(classification_system, history, None).await {
+        match ollama.prompt_with_history(classification_system, &[ChatMessage { role: "user".to_string(), content: input.to_string() }], None).await {
             Ok(cat) => cat.trim().to_uppercase(),
             Err(_) => "KNOWLEDGE".to_string()
         }
@@ -186,7 +186,7 @@ async fn handle_command_inner(
              - Choose the best tool for the user's request. For example, if they want to delete all .jpg files in Downloads, use 'execute_command' with command 'powershell' and arguments to remove files.\n\
              - To delete files on Windows, you can use execute_command with command 'powershell' and args ['-Command', 'Remove-Item -Path C:/Users/wjlan/Downloads/*.jpg -Force'].\n\n\
              Return the JSON object now:";
-        if let Ok(ai_decision) = ollama.prompt_with_history(system_tool_prompt, history, None).await {
+        if let Ok(ai_decision) = ollama.prompt_with_history(system_tool_prompt, &[ChatMessage { role: "user".to_string(), content: input.to_string() }], None).await {
             let trimmed = ai_decision.trim();
             if let (Some(start), Some(end)) = (trimmed.find('{'), trimmed.rfind('}')) {
                 if let Ok(decision) = serde_json::from_str::<serde_json::Value>(&trimmed[start..=end]) {
