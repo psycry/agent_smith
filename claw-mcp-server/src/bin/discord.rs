@@ -10,6 +10,45 @@ use claw_mcp_server::config::SandboxConfig;
 use claw_mcp_server::agent::{handle_command, ensure_ollama_setup};
 use claw_mcp_server::ai::ChatMessage;
 
+async fn send_long_message(ctx: &Context, msg: &Message, content: &str) -> serenity::Result<()> {
+    if content.len() <= 2000 {
+        msg.reply(&ctx.http, content).await?;
+        return Ok(());
+    }
+
+    let mut remaining = content;
+    let mut is_first = true;
+
+    while !remaining.is_empty() {
+        let split_len = if remaining.len() <= 2000 {
+            remaining.len()
+        } else {
+            let chunk_slice = &remaining[..2000];
+            if let Some(pos) = chunk_slice.rfind('\n') {
+                pos + 1
+            } else if let Some(pos) = chunk_slice.rfind(' ') {
+                pos + 1
+            } else {
+                2000
+            }
+        };
+
+        let (chunk, rest) = remaining.split_at(split_len);
+        let trimmed_chunk = chunk.trim();
+        if !trimmed_chunk.is_empty() {
+            if is_first {
+                msg.reply(&ctx.http, trimmed_chunk).await?;
+                is_first = false;
+            } else {
+                msg.channel_id.say(&ctx.http, trimmed_chunk).await?;
+            }
+        }
+        remaining = rest;
+    }
+
+    Ok(())
+}
+
 struct Handler {
     config: Arc<SandboxConfig>,
     location: String,
@@ -95,12 +134,12 @@ impl EventHandler for Handler {
                     final_response.push_str(&diag_text);
                 }
 
-                if let Err(why) = msg.reply(&ctx.http, final_response).await {
+                if let Err(why) = send_long_message(&ctx, &msg, &final_response).await {
                     println!("Error sending message: {:?}", why);
                 }
             }
             Err(e) => {
-                let _ = msg.reply(&ctx.http, format!("Error: {}", e)).await;
+                let _ = send_long_message(&ctx, &msg, &format!("Error: {}", e)).await;
             }
         }
     }
