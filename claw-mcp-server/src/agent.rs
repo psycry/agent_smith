@@ -106,6 +106,23 @@ pub async fn handle_command(
     input: &str,
     location: &str
 ) -> anyhow::Result<String> {
+    if history.len() > MAX_HISTORY {
+        history.drain(..history.len() - MAX_HISTORY);
+    }
+
+    let res = handle_command_inner(config, history, input, location).await;
+    if let Ok(ref resp) = res {
+        history.push(ChatMessage { role: "assistant".to_string(), content: resp.clone() });
+    }
+    res
+}
+
+async fn handle_command_inner(
+    config: &Arc<SandboxConfig>, 
+    history: &mut Vec<ChatMessage>,
+    input: &str,
+    location: &str
+) -> anyhow::Result<String> {
     println!("\n   [GRID MONITOR] Processing instruction: '{}'", input);
     let gemini_config = config.get_ai_config("gemini").unwrap();
     let ollama_config = config.get_ai_config("ollama").unwrap();
