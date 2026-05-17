@@ -1,0 +1,11 @@
+# Rust build artifacts
+claw-mcp-server/target/
+**/target/
+
+# Sensitive local configurations containing API keys & Discord tokens
+claw-mcp-server/sandbox_config.json
+**/sandbox_config.json
+
+# Local history/logs
+claw-mcp-server/history.txt
+**/history.txt

@@ -1,0 +1,37 @@
+{
+  "allowed_paths": [
+    "c:/Users/YourName/Projects/agent_smith"
+  ],
+  "allowed_commands": [
+    "git",
+    "ls",
+    "cargo"
+  ],
+  "whitelisted_tools": [
+    "read_file",
+    "write_file",
+    "list_directory",
+    "execute_command",
+    "get_system_stats",
+    "search_web"
+  ],
+  "ai_mode": "hybrid",
+  "ai_providers": {
+    "gemini": {
+      "api_key": "YOUR_GEMINI_API_KEY",
+      "default_model": "gemini-3-flash-preview"
+    },
+    "ollama": {
+      "api_key": "none",
+      "default_model": "llama3.2:1b"
+    },
+    "serper": {
+      "api_key": "YOUR_SERPER_API_KEY",
+      "default_model": "google"
+    }
+  },
+  "discord_token": "YOUR_DISCORD_BOT_TOKEN",
+  "discord_whitelist": [
+    0
+  ]
+}
