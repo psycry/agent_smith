@@ -11,31 +11,54 @@ use claw_mcp_server::agent::{handle_command, ensure_ollama_setup};
 use claw_mcp_server::ai::ChatMessage;
 
 async fn send_long_message(ctx: &Context, msg: &Message, content: &str) -> serenity::Result<()> {
-    if content.len() <= 2000 {
-        msg.reply(&ctx.http, content).await?;
+    if content.chars().count() <= 1900 {
+        let trimmed = content.trim();
+        if !trimmed.is_empty() {
+            msg.reply(&ctx.http, trimmed).await?;
+        }
         return Ok(());
     }
 
-    let mut remaining = content;
+    let mut remaining = content.to_string();
     let mut is_first = true;
 
     while !remaining.is_empty() {
-        let split_len = if remaining.len() <= 2000 {
-            remaining.len()
-        } else {
-            let chunk_slice = &remaining[..2000];
-            if let Some(pos) = chunk_slice.rfind('\n') {
-                pos + 1
-            } else if let Some(pos) = chunk_slice.rfind(' ') {
-                pos + 1
-            } else {
-                2000
-            }
-        };
+        // Yield to prevent thread starvation
+        tokio::task::yield_now().await;
 
-        let (chunk, rest) = remaining.split_at(split_len);
+        let char_len = remaining.chars().count();
+        if char_len <= 1900 {
+            let trimmed = remaining.trim();
+            if !trimmed.is_empty() {
+                if is_first {
+                    msg.reply(&ctx.http, trimmed).await?;
+                } else {
+                    msg.channel_id.say(&ctx.http, trimmed).await?;
+                }
+            }
+            break;
+        }
+
+        let mut split_char_idx = 1900;
+        let chars_vec: Vec<char> = remaining.chars().collect();
+        let chunk_chars = &chars_vec[..1900];
+
+        if let Some(pos) = chunk_chars.iter().rposition(|&c| c == '\n') {
+            split_char_idx = pos + 1;
+        } else if let Some(pos) = chunk_chars.iter().rposition(|&c| c == ' ') {
+            split_char_idx = pos + 1;
+        }
+
+        if split_char_idx == 0 {
+            split_char_idx = 1900;
+        }
+
+        let chunk: String = chars_vec[..split_char_idx].iter().collect();
+        let rest: String = chars_vec[split_char_idx..].iter().collect();
+
         let trimmed_chunk = chunk.trim();
         if !trimmed_chunk.is_empty() {
+            println!("   [SEND] Dispatching message chunk of {} characters...", trimmed_chunk.len());
             if is_first {
                 msg.reply(&ctx.http, trimmed_chunk).await?;
                 is_first = false;
@@ -43,6 +66,7 @@ async fn send_long_message(ctx: &Context, msg: &Message, content: &str) -> seren
                 msg.channel_id.say(&ctx.http, trimmed_chunk).await?;
             }
         }
+
         remaining = rest;
     }
 
