@@ -52,3 +52,56 @@ pub async fn list_directory(config: &SandboxConfig, input: ListDirectoryInput) -
     let content = entries.join("\n");
     Ok(CallToolResult::success(vec![Content::text(content)]))
 }
+
+#[derive(Deserialize, JsonSchema)]
+pub struct CreateDirectoryInput {
+    pub path: String,
+}
+
+pub async fn create_directory(config: &SandboxConfig, input: CreateDirectoryInput) -> Result<CallToolResult> {
+    if !config.is_path_allowed(&input.path) {
+        return Ok(CallToolResult::error(vec![Content::text("Path not allowed")]));
+    }
+    
+    fs::create_dir_all(&input.path)?;
+    Ok(CallToolResult::success(vec![Content::text("Directory created successfully")]))
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct DeleteFileInput {
+    pub path: String,
+}
+
+pub async fn delete_file(config: &SandboxConfig, input: DeleteFileInput) -> Result<CallToolResult> {
+    if !config.is_path_allowed(&input.path) {
+        return Ok(CallToolResult::error(vec![Content::text("Path not allowed")]));
+    }
+    
+    let path = std::path::Path::new(&input.path);
+    if !path.exists() {
+        return Ok(CallToolResult::error(vec![Content::text("Path does not exist")]));
+    }
+    
+    if path.is_dir() {
+        fs::remove_dir_all(path)?;
+        Ok(CallToolResult::success(vec![Content::text("Directory deleted successfully")]))
+    } else {
+        fs::remove_file(path)?;
+        Ok(CallToolResult::success(vec![Content::text("File deleted successfully")]))
+    }
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct MoveFileInput {
+    pub source: String,
+    pub destination: String,
+}
+
+pub async fn move_file(config: &SandboxConfig, input: MoveFileInput) -> Result<CallToolResult> {
+    if !config.is_path_allowed(&input.source) || !config.is_path_allowed(&input.destination) {
+        return Ok(CallToolResult::error(vec![Content::text("Path not allowed")]));
+    }
+    
+    fs::rename(&input.source, &input.destination)?;
+    Ok(CallToolResult::success(vec![Content::text("File/Directory moved successfully")]))
+}

@@ -177,6 +177,16 @@ impl EventHandler for Handler {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     println!("--- Agent Smith (Discord Node) ---");
+    
+    // Single-instance lock to prevent duplicate bot instances from running simultaneously
+    let _lock_socket = match std::net::TcpListener::bind("127.0.0.1:19989") {
+        Ok(listener) => listener,
+        Err(_) => {
+            println!("[!] WARNING: Another instance of Agent Smith Discord Node is already running. Exiting.");
+            std::process::exit(0);
+        }
+    };
+
     let config = Arc::new(SandboxConfig::load()?);
     let token = config.discord_token.as_ref().expect("DISCORD_TOKEN must be in sandbox_config.json");
 

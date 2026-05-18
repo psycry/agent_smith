@@ -209,17 +209,21 @@ async fn handle_command_inner(
                 - Schema: {\"tool\": \"write_file\", \"args\": {\"path\": \"<absolute_path>\", \"content\": \"<file_content>\"}}\n\
              3. list_directory\n\
                 - Schema: {\"tool\": \"list_directory\", \"args\": {\"path\": \"<absolute_path>\"}}\n\
-             4. execute_command\n\
+             4. create_directory\n\
+                - Schema: {\"tool\": \"create_directory\", \"args\": {\"path\": \"<absolute_path>\"}}\n\
+             5. delete_file\n\
+                - Schema: {\"tool\": \"delete_file\", \"args\": {\"path\": \"<absolute_path>\"}}\n\
+             6. move_file\n\
+                - Schema: {\"tool\": \"move_file\", \"args\": {\"source\": \"<source_path>\", \"destination\": \"<destination_path>\"}}\n\
+             7. execute_command\n\
                 - Schema: {\"tool\": \"execute_command\", \"args\": {\"command\": \"<command_name>\", \"args\": [\"<arg1>\", \"<arg2>\"]}}\n\
-             5. get_system_stats\n\
+             8. get_system_stats\n\
                 - Schema: {\"tool\": \"get_system_stats\", \"args\": {}}\n\n\
              RULES:\n\
              - Return ONLY the raw JSON object. Do not include markdown codeblocks (```json). Do not explain. Do not refuse.\n\
-             - You are fully authorized to perform all system commands (including creating directories, deleting files/folders, and moving items) within whitelisted paths.\n\
+             - You are fully authorized to perform all structural system operations (including creating directories, deleting files/folders, and moving items) within whitelisted paths.\n\
+             - ALWAYS use the native 'create_directory', 'delete_file', and 'move_file' tools to manage folders and files directly. DO NOT use shell commands or powershell for these tasks.\n\
              - If the user wants to 'sort through', 'browse', 'search', or 'look through' files/directories, use the native 'list_directory' tool instead of running shell commands.\n\
-             - To delete files on Windows, you can use execute_command with command 'powershell' and args ['-Command', 'Remove-Item -Path C:/Users/wjlan/Downloads/*.jpg -Force'].\n\
-             - To create a new folder/directory on Windows, use execute_command with command 'powershell' and args ['-Command', 'New-Item -ItemType Directory -Path C:/Users/wjlan/Downloads/executable -Force'].\n\
-             - To move files on Windows, use execute_command with command 'powershell' and args ['-Command', 'Move-Item -Path C:/Users/wjlan/Downloads/*.exe -Destination C:/Users/wjlan/Downloads/executable'].\n\
              - To physically sort or rearrange files on Windows, you can use execute_command with command 'powershell' and args ['-Command', 'Get-ChildItem -Path C:/Users/wjlan/Downloads | Sort-Object LastWriteTime | ForEach-Object { $_.FullName }'].\n\n\
              Return the JSON object now:";
         if let Ok(ai_decision) = ollama.prompt_with_history(system_tool_prompt, &[ChatMessage { role: "user".to_string(), content: input.to_string() }], None).await {
@@ -233,6 +237,9 @@ async fn handle_command_inner(
                             "read_file" => file_system::read_file(config, file_system::ReadFileInput { path: args["path"].as_str().unwrap_or_default().to_string() }).await?,
                             "write_file" => file_system::write_file(config, file_system::WriteFileInput { path: args["path"].as_str().unwrap_or_default().to_string(), content: args["content"].as_str().unwrap_or_default().to_string() }).await?,
                             "list_directory" => file_system::list_directory(config, file_system::ListDirectoryInput { path: args["path"].as_str().unwrap_or_default().to_string() }).await?,
+                            "create_directory" => file_system::create_directory(config, file_system::CreateDirectoryInput { path: args["path"].as_str().unwrap_or_default().to_string() }).await?,
+                            "delete_file" => file_system::delete_file(config, file_system::DeleteFileInput { path: args["path"].as_str().unwrap_or_default().to_string() }).await?,
+                            "move_file" => file_system::move_file(config, file_system::MoveFileInput { source: args["source"].as_str().unwrap_or_default().to_string(), destination: args["destination"].as_str().unwrap_or_default().to_string() }).await?,
                             "execute_command" => {
                                 let cmd = args["command"].as_str().unwrap_or_default();
                                 let args_vec: Vec<String> = args["args"].as_array().map(|a| a.iter().map(|v| v.as_str().unwrap_or_default().to_string()).collect()).unwrap_or_default();
@@ -247,6 +254,7 @@ async fn handle_command_inner(
                         let res_str = format_tool_result(tool_res);
                         let is_error = res_str.contains("Path not allowed") || 
                                        res_str.contains("Command not allowed") || 
+                                       res_str.contains("Path does not exist") ||
                                        (res_str.contains("Exit Code:") && !res_str.contains("Exit Code: 0"));
                         
                         let current_system_synthesis_system = if is_error {
