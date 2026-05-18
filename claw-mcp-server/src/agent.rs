@@ -150,13 +150,14 @@ async fn handle_command_inner(
 
     let classification_system = 
         "You are a routing classifier. Classify the user query into exactly one of two categories: 'SYSTEM' or 'KNOWLEDGE'.\n\n\
-         - SYSTEM: Query requests system operations, file reads, file writes, listing directories, executing shell commands, system stats, or deleting files.\n\
-         - KNOWLEDGE: Query requests general knowledge, facts, search queries, explanation of concepts, or creative writing.\n\n\
+         - SYSTEM: Query requests active system operations, file reads, file writes, listing directories, executing shell commands, system stats, or deleting files.\n\
+         - KNOWLEDGE: Query requests capability questions (e.g. 'can you...', 'are you able to...'), general knowledge, facts, search queries, explanation of concepts, or creative writing.\n\n\
          EXAMPLES:\n\
          - 'List files in my workspace' -> SYSTEM\n\
          - 'Delete any .jpg files in my Downloads directory' -> SYSTEM\n\
-         - 'Who is playing at bank of america stadium' -> KNOWLEDGE\n\
-         - 'How much do tickets to carowinds cost' -> KNOWLEDGE\n\n\
+         - 'can you sort through files of music smith' -> KNOWLEDGE\n\
+         - 'do you have the ability to read system stats' -> KNOWLEDGE\n\
+         - 'Who is playing at bank of america stadium' -> KNOWLEDGE\n\n\
          Return ONLY the word 'SYSTEM' or 'KNOWLEDGE'. Do not explain or refuse. Do not output anything else.";
     println!("   [1/3] Calibrating routing pathway (AI Mode: '{}')...", config.ai_mode);
     let category = if config.ai_mode == "cloud" {
