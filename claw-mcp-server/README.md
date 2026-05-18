@@ -1,5 +1,9 @@
 # 🕶️ Agent Smith (Claw MCP Server)
 
+<p align="center">
+  <img src="../Agent_Smith.png" alt="Agent Smith" width="100%">
+</p>
+
 > *"It is inevitable, Mr. Anderson."*
 
 Agent Smith is a high-performance, **Hybrid AI MCP Server** and Companion Assistant. It intelligently routes tasks between a fast local model (**Ollama**) and a powerful cloud model (**Gemini**) to provide a seamless, secure, and cost-effective AI experience.
