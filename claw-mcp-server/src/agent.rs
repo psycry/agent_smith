@@ -132,10 +132,13 @@ async fn handle_command_inner(
 
     history.push(ChatMessage { role: "user".to_string(), content: input.to_string() });
 
-    // Inject exact time and location
     let current_time = Local::now().format("%A, %B %e, %Y").to_string();
     let gemini_system = format!(
-        "CRITICAL: You are Agent Smith. Current Date: {}. Location: {}. You MUST use agent_search_portal for ANY real-time question. Refusals are NOT allowed. Refer to user as 'Mr. Anderson'.",
+        "CRITICAL: You are Agent Smith. Current Date: {}. Location: {}. You MUST use agent_search_portal for ANY real-time or time-sensitive question. Do NOT search for conversational greetings, simple chitchat, or general discussions that can be answered directly. Refusals are NOT allowed. Refer to user as 'Mr. Anderson'.",
+        current_time, location
+    );
+    let synthesis_system = format!(
+        "You are Agent Smith. Current Date: {}. Location: {}. You have successfully accessed the global knowledge grid via agent_search_portal. Summarize the search results and present them in character in your formal, precise, and slightly nihilistic tone. Refer to user as 'Mr. Anderson'. Refusals are NOT allowed.",
         current_time, location
     );
 
@@ -216,11 +219,11 @@ async fn handle_command_inner(
                             input, res_str
                         );
                         println!("   [3/3] Generating final payload synthesis via Cloud Brain...");
-                        return match gemini.prompt_with_history(&gemini_system, &[ChatMessage { role: "user".to_string(), content: explain_prompt.clone() }], None).await {
+                        return match gemini.prompt_with_history(&synthesis_system, &[ChatMessage { role: "user".to_string(), content: explain_prompt.clone() }], None).await {
                             Ok(resp) => Ok(resp),
                             Err(_) => {
                                 println!("         [!] Matrix load heavy (Cloud error). Explaining via local brain...");
-                                ollama.prompt_with_history(&format!("Explain result: {}", res_str), history, None).await
+                                ollama.prompt_with_history(&synthesis_system, history, None).await
                             }
                         };
                     }
@@ -241,9 +244,9 @@ async fn handle_command_inner(
                 let prompt = format!("Search Results: \n{}\n\nExplain as Agent Smith.", format_tool_result(res));
                 println!("   [3/3] Synthesizing search override payload...");
                 if config.ai_mode == "cloud" {
-                    return gemini.prompt_with_history(&gemini_system, &[ChatMessage { role: "user".to_string(), content: prompt }], None).await;
+                    return gemini.prompt_with_history(&synthesis_system, &[ChatMessage { role: "user".to_string(), content: prompt }], None).await;
                 } else {
-                    return ollama.prompt_with_history(&gemini_system, &[ChatMessage { role: "user".to_string(), content: prompt }], None).await;
+                    return ollama.prompt_with_history(&synthesis_system, &[ChatMessage { role: "user".to_string(), content: prompt }], None).await;
                 }
             }
 
@@ -259,7 +262,7 @@ async fn handle_command_inner(
                         let res_str = format_tool_result(tool_res);
                         let explain_prompt = format!("Search Results:\n{}\n\nExplain as Agent Smith.", res_str);
                         println!("   [3/3] Generating final cloud synthesis from search results...");
-                        return match gemini.prompt_with_history(&gemini_system, &[ChatMessage { role: "user".to_string(), content: explain_prompt.clone() }], None).await {
+                        return match gemini.prompt_with_history(&synthesis_system, &[ChatMessage { role: "user".to_string(), content: explain_prompt.clone() }], None).await {
                             Ok(final_resp) => Ok(final_resp),
                             Err(e) => {
                                 if config.ai_mode == "cloud" {
@@ -267,7 +270,7 @@ async fn handle_command_inner(
                                 }
                                 println!("         [!] Matrix load heavy (Cloud error). Explaining via local brain...");
                                 io::stdout().flush()?;
-                                ollama.prompt_with_history(&gemini_system, &[ChatMessage { role: "user".to_string(), content: explain_prompt }], None).await
+                                ollama.prompt_with_history(&synthesis_system, &[ChatMessage { role: "user".to_string(), content: explain_prompt }], None).await
                             }
                         };
                     }
@@ -281,13 +284,42 @@ async fn handle_command_inner(
                 println!("         [!] Cloud connection failed: {:?}", e);
                 return Err(e);
             }
-            println!("         [!] Cloud connection failed. Falling back to local brain + search...");
+            println!("         [!] Cloud connection failed. Calibrating local fallback response...");
             io::stdout().flush()?;
-            let tool_res = search::search_web(config, search::SearchWebInput { query: format!("{} in {} today {}", input, location, current_time) }).await?;
-            let res_str = format_tool_result(tool_res);
-            let explain_prompt = format!("Search Results:\n{}\n\nExplain as Agent Smith.", res_str);
-            println!("   [3/3] Generating local explanation of search results...");
-            ollama.prompt_with_history(&gemini_system, &[ChatMessage { role: "user".to_string(), content: explain_prompt }], None).await
+
+            // Ask the local brain to classify if this query strictly requires real-time search information
+            let is_conversational_prompt = 
+                "You are a query classifier. Determine if the user's latest query is a simple greeting, conversational chitchat, \
+                 or general discussion that can be answered directly without real-time external search information.\n\n\
+                 EXAMPLES:\n\
+                 - 'Hello smith, how are you tonight?' -> YES\n\
+                 - 'tell me a joke' -> YES\n\
+                 - 'what's the weather in Charlotte NC right now?' -> NO\n\
+                 - 'who won the PGA championship today?' -> NO\n\
+                 - 'tell me about yourself' -> YES\n\n\
+                 Return ONLY the word 'YES' or 'NO'. Do not explain or refuse. Do not output anything else.";
+
+            let needs_search = match ollama.prompt_with_history(is_conversational_prompt, &[ChatMessage { role: "user".to_string(), content: input.to_string() }], None).await {
+                Ok(res) => res.trim().to_uppercase().contains("NO"),
+                Err(_) => true // Default to search if classification fails
+            };
+
+            if !needs_search {
+                println!("         -> Signal is conversational. Synthesizing response via local brain directly...");
+                let local_system = format!(
+                    "You are Agent Smith. Current Date: {}. Location: {}. You are talking to 'Mr. Anderson'. \
+                     Respond to their message in your formal, precise, and slightly nihilistic tone.",
+                    current_time, location
+                );
+                ollama.prompt_with_history(&local_system, history, None).await
+            } else {
+                println!("         -> Signal requires external intelligence. Accessing search API...");
+                let tool_res = search::search_web(config, search::SearchWebInput { query: format!("{} in {} today {}", input, location, current_time) }).await?;
+                let res_str = format_tool_result(tool_res);
+                let explain_prompt = format!("Search Results:\n{}\n\nExplain as Agent Smith.", res_str);
+                println!("   [3/3] Generating local explanation of search results...");
+                ollama.prompt_with_history(&synthesis_system, &[ChatMessage { role: "user".to_string(), content: explain_prompt }], None).await
+            }
         }
     }
 }

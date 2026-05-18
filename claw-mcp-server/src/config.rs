@@ -24,7 +24,16 @@ pub struct SandboxConfig {
 impl SandboxConfig {
     pub fn load() -> Result<Self> {
         let config_path = Path::new("sandbox_config.json");
-        let config_str = fs::read_to_string(config_path)?;
+        let config_str = if config_path.exists() {
+            fs::read_to_string(config_path)?
+        } else {
+            let fallback_path = Path::new("claw-mcp-server/sandbox_config.json");
+            if fallback_path.exists() {
+                fs::read_to_string(fallback_path)?
+            } else {
+                return Err(anyhow::anyhow!("sandbox_config.json not found in current directory or claw-mcp-server/"));
+            }
+        };
         let config: SandboxConfig = serde_json::from_str(&config_str)?;
         Ok(config)
     }

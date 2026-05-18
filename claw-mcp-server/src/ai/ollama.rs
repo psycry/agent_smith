@@ -16,8 +16,8 @@ impl OllamaProvider {
     pub fn new(model: String) -> Self {
         Self {
             model,
-            // 30 second timeout - Ollama should be fast locally
-            client: Client::builder().timeout(Duration::from_secs(30)).build().unwrap(),
+            // 120 second timeout - allows local model load times on various hardware under load
+            client: Client::builder().timeout(Duration::from_secs(120)).build().unwrap(),
             url: "http://localhost:11434/api/chat".to_string(),
         }
     }
