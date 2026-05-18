@@ -10,7 +10,18 @@ pub struct ReadFileInput {
     pub path: String,
 }
 
+fn validate_no_traversal(path_str: &str) -> Result<(), CallToolResult> {
+    let path = std::path::Path::new(path_str);
+    if path.components().any(|c| c == std::path::Component::ParentDir) || path_str.contains("..") {
+        return Err(CallToolResult::error(vec![Content::text("Path traversal detected")]));
+    }
+    Ok(())
+}
+
 pub async fn read_file(config: &SandboxConfig, input: ReadFileInput) -> Result<CallToolResult> {
+    if let Err(e) = validate_no_traversal(&input.path) {
+        return Ok(e);
+    }
     let safe_path = match config.resolve_safe_path(&input.path) {
         Some(p) => p,
         None => return Ok(CallToolResult::error(vec![Content::text("Path not allowed")])),
@@ -27,6 +38,9 @@ pub struct WriteFileInput {
 }
 
 pub async fn write_file(config: &SandboxConfig, input: WriteFileInput) -> Result<CallToolResult> {
+    if let Err(e) = validate_no_traversal(&input.path) {
+        return Ok(e);
+    }
     let safe_path = match config.resolve_safe_path(&input.path) {
         Some(p) => p,
         None => return Ok(CallToolResult::error(vec![Content::text("Path not allowed")])),
@@ -42,6 +56,9 @@ pub struct ListDirectoryInput {
 }
 
 pub async fn list_directory(config: &SandboxConfig, input: ListDirectoryInput) -> Result<CallToolResult> {
+    if let Err(e) = validate_no_traversal(&input.path) {
+        return Ok(e);
+    }
     let safe_path = match config.resolve_safe_path(&input.path) {
         Some(p) => p,
         None => return Ok(CallToolResult::error(vec![Content::text("Path not allowed")])),
@@ -62,6 +79,9 @@ pub struct CreateDirectoryInput {
 }
 
 pub async fn create_directory(config: &SandboxConfig, input: CreateDirectoryInput) -> Result<CallToolResult> {
+    if let Err(e) = validate_no_traversal(&input.path) {
+        return Ok(e);
+    }
     let safe_path = match config.resolve_safe_path(&input.path) {
         Some(p) => p,
         None => return Ok(CallToolResult::error(vec![Content::text("Path not allowed")])),
@@ -77,6 +97,9 @@ pub struct DeleteFileInput {
 }
 
 pub async fn delete_file(config: &SandboxConfig, input: DeleteFileInput) -> Result<CallToolResult> {
+    if let Err(e) = validate_no_traversal(&input.path) {
+        return Ok(e);
+    }
     let safe_path = match config.resolve_safe_path(&input.path) {
         Some(p) => p,
         None => return Ok(CallToolResult::error(vec![Content::text("Path not allowed")])),
@@ -102,6 +125,12 @@ pub struct MoveFileInput {
 }
 
 pub async fn move_file(config: &SandboxConfig, input: MoveFileInput) -> Result<CallToolResult> {
+    if let Err(e) = validate_no_traversal(&input.source) {
+        return Ok(e);
+    }
+    if let Err(e) = validate_no_traversal(&input.destination) {
+        return Ok(e);
+    }
     let safe_source = match config.resolve_safe_path(&input.source) {
         Some(p) => p,
         None => return Ok(CallToolResult::error(vec![Content::text("Path not allowed")])),

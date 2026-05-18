@@ -25,13 +25,7 @@ pub async fn execute_command(config: &SandboxConfig, input: ExecuteCommandInput)
         "cat" => "cat",
         "powershell" => "powershell",
         "powershell.exe" => "powershell.exe",
-        other => {
-            if config.is_command_allowed(other) {
-                other
-            } else {
-                return Ok(CallToolResult::error(vec![Content::text("Command not allowed")]));
-            }
-        }
+        _ => return Ok(CallToolResult::error(vec![Content::text("Command not allowed")])),
     };
     
     let mut args = input.args.clone();
