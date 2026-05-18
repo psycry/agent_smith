@@ -266,18 +266,39 @@ async fn handle_command_inner(
                             )
                         };
 
+                        let summary_outcome = if is_error {
+                            format!("The operation FAILED. Details: {}", res_str)
+                        } else {
+                            if res_str.contains("Exit Code: 0") && (res_str.contains("STDOUT:\n\n") || res_str.contains("STDOUT:\r\n\r\n") || res_str.trim().ends_with("STDOUT:")) {
+                                "The operation was a 100% SUCCESS. (Note: The command executed successfully with Exit Code 0 and returned empty output, which is the expected behavior for successful deletions/actions on this system).".to_string()
+                            } else {
+                                format!("The operation was a 100% SUCCESS. Details: {}", res_str)
+                            }
+                        };
+
                         let explain_prompt = format!(
                             "The user requested: '{}'.\n\
                              The system tool execution result is: {}\n\n\
                              Please confirm to the user that the operation has been completed successfully in character as Agent Smith.",
-                            input, res_str
+                            input, summary_outcome
                         );
                         println!("   [3/3] Generating final payload synthesis via Cloud Brain...");
                         return match gemini.prompt_with_history(&current_system_synthesis_system, &[ChatMessage { role: "user".to_string(), content: explain_prompt.clone() }], None).await {
                             Ok(resp) => Ok(resp),
                             Err(_) => {
                                 println!("         [!] Matrix load heavy (Cloud error). Explaining via local brain...");
-                                ollama.prompt_with_history(&current_system_synthesis_system, &[ChatMessage { role: "user".to_string(), content: explain_prompt }], None).await
+                                if is_error {
+                                    ollama.prompt_with_history(&current_system_synthesis_system, &[ChatMessage { role: "user".to_string(), content: explain_prompt }], None).await
+                                } else {
+                                    let templates = [
+                                        "It is done, Mr. Anderson. The Matrix has been updated. Your request to '{}' has been executed with absolute precision.",
+                                        "The command has completed, Mr. Anderson. The construct has reshaped itself to accommodate your request: '{}'.",
+                                        "I have adjusted the simulation parameters as you requested, Mr. Anderson. '{}' has been processed successfully.",
+                                        "The request to '{}' has been fulfilled, Mr. Anderson. Order has been restored to this sector of the construct."
+                                    ];
+                                    let idx = (input.len() + res_str.len()) % templates.len();
+                                    Ok(templates[idx].replace("{}", input))
+                                }
                             }
                         };
                     }
