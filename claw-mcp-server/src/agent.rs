@@ -229,6 +229,7 @@ async fn handle_command_inner(
              - You are fully authorized to perform all structural system operations (including creating directories, deleting files/folders, and moving items) within whitelisted paths.\n\
              - ALWAYS use the native 'create_directory', 'delete_file', and 'move_file' tools to manage folders and files directly. DO NOT use shell commands or powershell for these tasks.\n\
              - Always translate relative terms like 'downloads folder', 'workspace', 'home folder' to their corresponding absolute paths in the PRIMARY WHITELISTED PATHS.\n\
+             - When extracting file or directory names from user prompts, do not append the words 'directory', 'folder', or 'file' to the name itself unless the user explicitly requested it with quotes or specific phrasing. (e.g., 'create a test directory' means path 'C:/Users/wjlan/Downloads/test', NOT 'C:/Users/wjlan/Downloads/test_directory'; 'delete test' means path 'C:/Users/wjlan/Downloads/test').\n\
              - If the user wants to 'sort through', 'browse', 'search', or 'look through' files/directories, use the native 'list_directory' tool instead of running shell commands.\n\
              - To physically sort or rearrange files on Windows, you can use execute_command with command 'powershell' and args ['-Command', 'Get-ChildItem -Path C:/Users/wjlan/Downloads | Sort-Object LastWriteTime | ForEach-Object { $_.FullName }'].\n\n\
              Return the JSON object now:";
