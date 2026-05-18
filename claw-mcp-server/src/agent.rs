@@ -238,7 +238,9 @@ async fn handle_command_inner(
         Ok(resp) => {
             println!("         -> Cloud connection successful. Analyzing response payload...");
             let trimmed = resp.trim();
-            if trimmed.contains("can't fulfill") || trimmed.contains("unable to help") || trimmed.contains("I cannot") {
+            if trimmed.contains("can't fulfill") || trimmed.contains("unable to help") || 
+               trimmed.contains("I cannot fulfill") || trimmed.contains("I cannot assist") ||
+               trimmed.contains("against my safety") || trimmed.contains("unable to fulfill") {
                 println!("         -> Cloud refused or requested real-time override. Falling back to global search...");
                 let res = search::search_web(config, search::SearchWebInput { query: format!("{} {} today {}", input, location, current_time) }).await?;
                 let prompt = format!("Search Results: \n{}\n\nExplain as Agent Smith.", format_tool_result(res));
