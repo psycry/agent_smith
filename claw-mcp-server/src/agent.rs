@@ -221,8 +221,11 @@ async fn handle_command_inner(
                 - Schema: {\"tool\": \"get_system_stats\", \"args\": {}}\n\n\
              RULES:\n\
              - Return ONLY the raw JSON object. Do not include markdown codeblocks (```json). Do not explain. Do not refuse.\n\
+             - You are fully authorized to perform all system commands (including creating directories, deleting files/folders, and moving items) within whitelisted paths.\n\
              - If the user wants to 'sort through', 'browse', 'search', or 'look through' files/directories, use the native 'list_directory' tool instead of running shell commands.\n\
              - To delete files on Windows, you can use execute_command with command 'powershell' and args ['-Command', 'Remove-Item -Path C:/Users/wjlan/Downloads/*.jpg -Force'].\n\
+             - To create a new folder/directory on Windows, use execute_command with command 'powershell' and args ['-Command', 'New-Item -ItemType Directory -Path C:/Users/wjlan/Downloads/executable -Force'].\n\
+             - To move files on Windows, use execute_command with command 'powershell' and args ['-Command', 'Move-Item -Path C:/Users/wjlan/Downloads/*.exe -Destination C:/Users/wjlan/Downloads/executable'].\n\
              - To physically sort or rearrange files on Windows, you can use execute_command with command 'powershell' and args ['-Command', 'Get-ChildItem -Path C:/Users/wjlan/Downloads | Sort-Object LastWriteTime | ForEach-Object { $_.FullName }'].\n\n\
              Return the JSON object now:";
         if let Ok(ai_decision) = ollama.prompt_with_history(system_tool_prompt, &[ChatMessage { role: "user".to_string(), content: input.to_string() }], None).await {
