@@ -6,20 +6,20 @@
 
 > *"It is inevitable, Mr. Anderson."*
 
-Agent Smith is a high-performance, **Hybrid AI MCP Server** and Companion Assistant. It intelligently routes tasks between a fast local model (**Ollama**) and a powerful cloud model (**Gemini**) to provide a seamless, secure, and cost-effective AI experience.
+Agent Smith is a high-performance, **Hybrid AI MCP Server** and Companion Assistant. It intelligently routes tasks between a fast local model and a powerful cloud model to provide a seamless, secure, and cost-effective AI experience.
 
 ## 🚀 Features
 
 - **Hybrid Intelligence**: 
-  - **Local Model (e.g., Ollama/Local AI)**: Handles system tasks (file ops, shell commands, metrics) with zero latency and zero API cost.
-  - **Cloud Model (e.g., Gemini/Cloud AI)**: Handles complex reasoning, knowledge queries, and real-time information.
+  - **Local Model**: Handles system tasks (file ops, shell commands, metrics) with zero latency and zero API cost.
+  - **Cloud Model**: Handles complex reasoning, knowledge queries, and real-time information.
 - **Matrix Persona**: Fully integrated "Agent Smith" personality with formal, precise, and slightly nihilistic communication.
 - **Context Management**: Persistent multi-turn conversation history with a sliding-window constraint (restricted to the last 10 turns) to prevent token bloat and context drift. Assistant responses are automatically recorded and appended to guarantee continuous, contextually accurate multi-turn conversation.
-- **Global Search Integration**: Real-time web search powered by the **Serper API** (Google Search) with fallback scraper capabilities.
-- **Smart Conversational Fallback**: If cloud access fails/exceeds quota, conversational chitchat (like basic greetings) is handled directly by Ollama's local brain using the conversation history, completely bypassing web searches to prevent history pollution.
+- **Global Search Integration**: Real-time web search integration with fallback scraper capabilities.
+- **Smart Conversational Fallback**: If cloud access fails/exceeds quota, conversational chitchat (like basic greetings) is handled directly by the local model using the conversation history, completely bypassing web searches to prevent history pollution.
 - **Workspace-Root Compatibility**: Run scripts directly from the workspace root workspace directory. The configuration loader automatically falls back to `claw-mcp-server/sandbox_config.json` if run from the root.
 - **Sandbox Security**: Strict whitelist-based control over which directories the agent can read/write and which shell commands it can execute.
-- **Zero-Manual-Setup**: Automatic detection of Ollama and models, with clear instructional guidance for system installation.
+- **Zero-Manual-Setup**: Automatic detection of local models, with clear instructional guidance for system installation.
 
 ## 🛠️ Architecture
 
@@ -30,15 +30,15 @@ Agent Smith uses a highly optimized dual-routing hybrid execution pipeline:
    - `SYSTEM` tasks stay local for maximum privacy and speed, executing whitelisted sandbox tools. Once executed, the raw output is sent to the **Cloud Brain** for final synthesis. This guarantees a premium, highly contextual, in-character Agent Smith response confirming successful operation, with a local fallback if cloud resources are degraded.
    - `KNOWLEDGE` tasks go directly to the cloud model for high-fidelity reasoning.
 3. **Split Prompt Synthesis (Double-Bind Immunity)**: Avoids prompt-conflict double-binds by separating system prompts:
-   - `gemini_system` dictates tool routing and execution.
-   - `synthesis_system` guides the agent's persona during search-result formatting and system-tool output explanation, ensuring Gemini doesn't refuse to generate text or complain about the tool use protocol.
+   - The cloud system prompt (`gemini_system`) dictates tool routing and execution.
+   - The synthesis system prompt (`synthesis_system`) guides the agent's persona during search-result formatting and system-tool output explanation, ensuring the cloud model doesn't refuse to generate text or complain about the tool use protocol.
 
 ## 📦 Installation & Setup
 
 ### 1. Prerequisites
 - **Rust**: Installed on your machine.
-- **Ollama**: Recommended for the local routing layer.
-- **Gemini API Key**: Required for knowledge queries (get one at [Google AI Studio](https://aistudio.google.com/)).
+- **Local Model**: A local model provider (e.g., Ollama, LocalAI) for the local routing layer.
+- **Cloud API Key**: Required for cloud knowledge queries (e.g., Gemini, Anthropic, OpenAI).
 
 ### 2. Configuration
 Update `sandbox_config.json` with your API key and allowed paths:
@@ -113,8 +113,8 @@ If you explicitly mention the bot using the `@Agent Smith` notation:
 ```
 
 ### 5. Failure Immunity & Resilient Timeouts
-- **Cloud Timeouts (10s)**: All outbound cloud operations (including Serper/Google searches and Gemini calls) employ a strict **10-second request timeout** to eliminate network hangs. In the event of a cloud failure, the bot gracefully rolls back to local brain paths without crashing.
-- **Local AI Timeout & Cooperative Cancellation (120s)**: The local Ollama client timeout is set to **120 seconds** (increased from 30s) to provide ample headroom. To prevent blocking the runtime during heavy loading or context-processing, the execution pipeline utilizes `tokio::select!` and `tokio::signal::ctrl_c()` to cooperatively cancel the active HTTP request immediately upon operator abort. This instantly halts remote GPU/CPU compilation and frees system memory/VRAM.
+- **Cloud Timeouts (10s)**: All outbound cloud operations (including search and cloud model calls) employ a strict **10-second request timeout** to eliminate network hangs. In the event of a cloud failure, the bot gracefully rolls back to local brain paths without crashing.
+- **Local AI Timeout & Cooperative Cancellation (120s)**: The local model client timeout is set to **120 seconds** (increased from 30s) to provide ample headroom. To prevent blocking the runtime during heavy loading or context-processing, the execution pipeline utilizes `tokio::select!` and `tokio::signal::ctrl_c()` to cooperatively cancel the active HTTP request immediately upon operator abort. This instantly halts remote GPU/CPU compilation and frees system memory/VRAM.
 
 ### 6. Hardened UTF-8 Safe Message Chunking & Thread-Safety
 Outbound responses (including long system tool summaries or telemetry grids) that exceed 1900 characters are automatically split near space or newline boundaries. 
@@ -131,7 +131,7 @@ Agent Smith can interact with your system via the following whitelisted tools:
 - `list_directory`: Explore project structures.
 - `execute_command`: Run whitelisted shell commands. On Windows, PowerShell (`powershell` / `powershell.exe`) invocations are dynamically optimized by automatically injecting `-NoProfile` and `-NonInteractive` flags, bypassing slow `.NET` profile loading overhead to drop process launch latencies to near-instantaneous.
 - `get_system_stats`: Monitor CPU/Memory performance.
-- `search_web`: Retrieve real-time data via the Serper (Google Search) API.
+- `search_web`: Retrieve real-time data via a search engine API.
 
 ## 🔒 Audit-Hardened Security Sandbox
 
