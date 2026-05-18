@@ -130,6 +130,15 @@ async fn handle_command_inner(
     let gemini = GeminiProvider::new(gemini_config.api_key.clone(), gemini_config.default_model.clone());
     let ollama = OllamaProvider::new(ollama_config.default_model.clone());
 
+    let lower_input = input.trim().to_lowercase();
+    let is_capability_question = 
+        lower_input.starts_with("can you") || 
+        lower_input.starts_with("do you have") || 
+        lower_input.starts_with("are you able to") || 
+        lower_input.starts_with("is it possible for you") || 
+        lower_input.starts_with("what can you") || 
+        lower_input.starts_with("what are you capable of");
+
     history.push(ChatMessage { role: "user".to_string(), content: input.to_string() });
 
     let current_time = Local::now().format("%A, %B %e, %Y").to_string();
@@ -163,9 +172,14 @@ async fn handle_command_inner(
     let category = if config.ai_mode == "cloud" {
         "KNOWLEDGE".to_string()
     } else {
-        match ollama.prompt_with_history(classification_system, &[ChatMessage { role: "user".to_string(), content: input.to_string() }], None).await {
-            Ok(cat) => cat.trim().to_uppercase(),
-            Err(_) => "KNOWLEDGE".to_string()
+        if is_capability_question {
+            println!("         -> Signal matches capability signature. Auto-routing to KNOWLEDGE.");
+            "KNOWLEDGE".to_string()
+        } else {
+            match ollama.prompt_with_history(classification_system, &[ChatMessage { role: "user".to_string(), content: input.to_string() }], None).await {
+                Ok(cat) => cat.trim().to_uppercase(),
+                Err(_) => "KNOWLEDGE".to_string()
+            }
         }
     };
     println!("         -> Signal classified as: {}", category);
@@ -308,9 +322,14 @@ async fn handle_command_inner(
                  - 'tell me about yourself' -> YES\n\n\
                  Return ONLY the word 'YES' or 'NO'. Do not explain or refuse. Do not output anything else.";
 
-            let needs_search = match ollama.prompt_with_history(is_conversational_prompt, &[ChatMessage { role: "user".to_string(), content: input.to_string() }], None).await {
-                Ok(res) => res.trim().to_uppercase().contains("NO"),
-                Err(_) => true // Default to search if classification fails
+            let needs_search = if is_capability_question {
+                println!("         -> Signal is a capability question. Bypassing search.");
+                false
+            } else {
+                match ollama.prompt_with_history(is_conversational_prompt, &[ChatMessage { role: "user".to_string(), content: input.to_string() }], None).await {
+                    Ok(res) => res.trim().to_uppercase().contains("NO"),
+                    Err(_) => true // Default to search if classification fails
+                }
             };
 
             if !needs_search {
