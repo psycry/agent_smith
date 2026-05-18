@@ -133,29 +133,55 @@ impl EventHandler for Handler {
                 let mut final_response = response;
                 // If they explicitly mentioned the bot using @ notation, append the diagnostic footer!
                 if is_mentioned {
-                    let diag_text = format!(
-                        "\n\n🕶️ **Matrix Grid Diagnostic Footprint:**\n\
-                         - **Routing Pathway:** `{}` (Category: `{}`)\n\
-                         - **Ollama API Calls:** {}\n\
-                         - **Gemini API Calls:** {}\n\
-                         - **Live Web Search Query:** {}\n\
-                         - **Search Engine Latency:** {}",
-                        diagnostic.ai_mode,
-                        diagnostic.category,
-                        if diagnostic.ollama_calls.is_empty() {
-                            "`Bypassed`".to_string()
+                    let is_private = msg.guild_id.is_none();
+                    let raw_content = msg.content.clone();
+                    let show_full_telemetry = is_private || raw_content.contains("--debug") || raw_content.contains("-t");
+
+                    if show_full_telemetry {
+                        let diag_text = format!(
+                            "\n\n🕶️ **Matrix Grid Diagnostic Footprint:**\n\
+                             - **Routing Pathway:** `{}` (Category: `{}`)\n\
+                             - **Local AI Calls:** {}\n\
+                             - **Cloud AI Calls:** {}\n\
+                             - **Live Web Search Query:** {}\n\
+                             - **Search Engine Latency:** {}",
+                            diagnostic.ai_mode,
+                            diagnostic.category,
+                            if diagnostic.local_calls.is_empty() {
+                                "`Bypassed`".to_string()
+                            } else {
+                                diagnostic.local_calls.iter().map(|(m, d)| format!("`{}` ({:.2?})", m, d)).collect::<Vec<_>>().join(", ")
+                            },
+                            if diagnostic.cloud_calls.is_empty() {
+                                "`Bypassed`".to_string()
+                            } else {
+                                diagnostic.cloud_calls.iter().map(|(m, d)| format!("`{}` ({:.2?})", m, d)).collect::<Vec<_>>().join(", ")
+                            },
+                            diagnostic.search_query.as_ref().map(|q| format!("`\"{}\"`", q)).unwrap_or_else(|| "`None`".to_string()),
+                            diagnostic.search_latency.as_ref().map(|d| format!("`{:.2?}`", d)).unwrap_or_else(|| "`N/A`".to_string())
+                        );
+                        final_response.push_str(&diag_text);
+                    } else {
+                        // Compact, elegant 1-line diagnostic summary for public channels
+                        let local_sum = if diagnostic.local_calls.is_empty() {
+                            "Bypassed".to_string()
                         } else {
-                            diagnostic.ollama_calls.iter().map(|(m, d)| format!("`{}` ({:.2?})", m, d)).collect::<Vec<_>>().join(", ")
-                        },
-                        if diagnostic.gemini_calls.is_empty() {
-                            "`Bypassed`".to_string()
+                            diagnostic.local_calls.iter().map(|(m, d)| format!("{} ({:.1?})", m, d)).collect::<Vec<_>>().join(", ")
+                        };
+                        let cloud_sum = if diagnostic.cloud_calls.is_empty() {
+                            "Bypassed".to_string()
                         } else {
-                            diagnostic.gemini_calls.iter().map(|(m, d)| format!("`{}` ({:.2?})", m, d)).collect::<Vec<_>>().join(", ")
-                        },
-                        diagnostic.search_query.as_ref().map(|q| format!("`\"{}\"`", q)).unwrap_or_else(|| "`None`".to_string()),
-                        diagnostic.search_latency.as_ref().map(|d| format!("`{:.2?}`", d)).unwrap_or_else(|| "`N/A`".to_string())
-                    );
-                    final_response.push_str(&diag_text);
+                            diagnostic.cloud_calls.iter().map(|(m, d)| format!("{} ({:.1?})", m, d)).collect::<Vec<_>>().join(", ")
+                        };
+                        let diag_text = format!(
+                            "\n\n🕶️ *Path: {} ({}) | Local: {} | Cloud: {}*",
+                            diagnostic.ai_mode,
+                            diagnostic.category,
+                            local_sum,
+                            cloud_sum
+                        );
+                        final_response.push_str(&diag_text);
+                    }
                 }
 
                 if let Err(why) = send_long_message(&ctx, &msg, &final_response).await {

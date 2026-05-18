@@ -6,13 +6,13 @@ use reqwest::Client;
 use std::time::Duration;
 
 #[derive(Clone)]
-pub struct GeminiProvider {
+pub struct CloudProvider {
     api_key: String,
     default_model: String,
     client: Client,
 }
 
-impl GeminiProvider {
+impl CloudProvider {
     pub fn new(api_key: String, default_model: String) -> Self {
         Self {
             api_key,
@@ -23,7 +23,7 @@ impl GeminiProvider {
 }
 
 #[async_trait]
-impl AiProvider for GeminiProvider {
+impl AiProvider for CloudProvider {
     async fn prompt_with_history(
         &self, 
         system_instructions: &str,
@@ -76,7 +76,7 @@ impl AiProvider for GeminiProvider {
             ]
         });
 
-        println!("         [GEMINI API] Dispatching query to cloud model '{}'...", model_name);
+        println!("         [CLOUD AI API] Dispatching query to cloud model '{}'...", model_name);
         let start_time = std::time::Instant::now();
 
         let response = self.client.post(&url)
@@ -88,13 +88,17 @@ impl AiProvider for GeminiProvider {
         let json_resp: serde_json::Value = response.json().await?;
 
         if !status.is_success() {
-            let msg = json_resp["error"]["message"].as_str().unwrap_or("Unknown Gemini Error");
-            println!("         [GEMINI API] Cloud model error: {}", msg);
-            return Err(anyhow!("Gemini Error ({}): {}", status, msg));
+            let msg = json_resp["error"]["message"].as_str().unwrap_or("Unknown Cloud AI Error");
+            println!("         [CLOUD AI API] Cloud model error: {}", msg);
+            return Err(anyhow!("Cloud AI Error ({}): {}", status, msg));
         }
 
         let duration = start_time.elapsed();
-        println!("         [GEMINI API] Cloud response received successfully (took {:.2?})", duration);
+        println!("         [CLOUD AI API] Cloud response received successfully (took {:.2?})", duration);
+
+        let _ = crate::agent::DIAGNOSTICS.try_with(|d| {
+            d.borrow_mut().cloud_calls.push((model_name.to_string(), duration));
+        });
 
         let candidate = &json_resp["candidates"][0];
         
@@ -121,6 +125,6 @@ impl AiProvider for GeminiProvider {
             }
         }
 
-        Err(anyhow!("Gemini returned an empty response."))
+        Err(anyhow!("Cloud AI returned an empty response."))
     }
 }

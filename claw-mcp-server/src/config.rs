@@ -38,12 +38,53 @@ impl SandboxConfig {
         Ok(config)
     }
 
+    pub fn resolve_safe_path(&self, raw_path: &str) -> Option<std::path::PathBuf> {
+        let path = Path::new(raw_path);
+        
+        // Find the closest existing ancestor
+        let mut ancestor = path.to_path_buf();
+        let mut sub_path = std::path::PathBuf::new();
+        
+        while !ancestor.exists() {
+            if let Some(parent) = ancestor.parent() {
+                if let Some(file_name) = ancestor.file_name() {
+                    let mut new_sub = std::path::PathBuf::from(file_name);
+                    new_sub.push(sub_path);
+                    sub_path = new_sub;
+                }
+                ancestor = parent.to_path_buf();
+            } else {
+                break;
+            }
+        }
+        
+        // Canonicalize the existing ancestor
+        let canonical_input = if let Ok(canonical_ancestor) = fs::canonicalize(&ancestor) {
+            let mut resolved = canonical_ancestor;
+            resolved.push(sub_path);
+            resolved
+        } else {
+            return None;
+        };
+
+        // Check if starts_with any allowed path
+        let is_allowed = self.allowed_paths.iter().any(|allowed| {
+            if let Ok(canonical_allowed) = fs::canonicalize(Path::new(allowed)) {
+                canonical_input.starts_with(&canonical_allowed)
+            } else {
+                false
+            }
+        });
+
+        if is_allowed {
+            Some(canonical_input)
+        } else {
+            None
+        }
+    }
+
     pub fn is_path_allowed(&self, path: &str) -> bool {
-        let path = path.replace("\\", "/").to_lowercase();
-        self.allowed_paths.iter().any(|p| {
-            let p = p.replace("\\", "/").to_lowercase();
-            path.starts_with(&p)
-        })
+        self.resolve_safe_path(path).is_some()
     }
 
     pub fn is_command_allowed(&self, command: &str) -> bool {

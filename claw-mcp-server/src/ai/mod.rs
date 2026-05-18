@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
 
-pub mod gemini;
-pub mod ollama;
+pub mod cloud;
+pub mod local;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {

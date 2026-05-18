@@ -11,11 +11,12 @@ pub struct ReadFileInput {
 }
 
 pub async fn read_file(config: &SandboxConfig, input: ReadFileInput) -> Result<CallToolResult> {
-    if !config.is_path_allowed(&input.path) {
-        return Ok(CallToolResult::error(vec![Content::text("Path not allowed")]));
-    }
+    let safe_path = match config.resolve_safe_path(&input.path) {
+        Some(p) => p,
+        None => return Ok(CallToolResult::error(vec![Content::text("Path not allowed")])),
+    };
     
-    let content = fs::read_to_string(&input.path)?;
+    let content = fs::read_to_string(safe_path)?;
     Ok(CallToolResult::success(vec![Content::text(content)]))
 }
 
@@ -26,11 +27,12 @@ pub struct WriteFileInput {
 }
 
 pub async fn write_file(config: &SandboxConfig, input: WriteFileInput) -> Result<CallToolResult> {
-    if !config.is_path_allowed(&input.path) {
-        return Ok(CallToolResult::error(vec![Content::text("Path not allowed")]));
-    }
+    let safe_path = match config.resolve_safe_path(&input.path) {
+        Some(p) => p,
+        None => return Ok(CallToolResult::error(vec![Content::text("Path not allowed")])),
+    };
     
-    fs::write(&input.path, &input.content)?;
+    fs::write(safe_path, &input.content)?;
     Ok(CallToolResult::success(vec![Content::text("File written successfully")]))
 }
 
@@ -40,11 +42,12 @@ pub struct ListDirectoryInput {
 }
 
 pub async fn list_directory(config: &SandboxConfig, input: ListDirectoryInput) -> Result<CallToolResult> {
-    if !config.is_path_allowed(&input.path) {
-        return Ok(CallToolResult::error(vec![Content::text("Path not allowed")]));
-    }
+    let safe_path = match config.resolve_safe_path(&input.path) {
+        Some(p) => p,
+        None => return Ok(CallToolResult::error(vec![Content::text("Path not allowed")])),
+    };
     
-    let entries = fs::read_dir(&input.path)?
+    let entries = fs::read_dir(safe_path)?
         .filter_map(|entry| entry.ok())
         .map(|entry| entry.file_name().to_string_lossy().to_string())
         .collect::<Vec<_>>();
@@ -59,11 +62,12 @@ pub struct CreateDirectoryInput {
 }
 
 pub async fn create_directory(config: &SandboxConfig, input: CreateDirectoryInput) -> Result<CallToolResult> {
-    if !config.is_path_allowed(&input.path) {
-        return Ok(CallToolResult::error(vec![Content::text("Path not allowed")]));
-    }
+    let safe_path = match config.resolve_safe_path(&input.path) {
+        Some(p) => p,
+        None => return Ok(CallToolResult::error(vec![Content::text("Path not allowed")])),
+    };
     
-    fs::create_dir_all(&input.path)?;
+    fs::create_dir_all(safe_path)?;
     Ok(CallToolResult::success(vec![Content::text("Directory created successfully")]))
 }
 
@@ -73,20 +77,20 @@ pub struct DeleteFileInput {
 }
 
 pub async fn delete_file(config: &SandboxConfig, input: DeleteFileInput) -> Result<CallToolResult> {
-    if !config.is_path_allowed(&input.path) {
-        return Ok(CallToolResult::error(vec![Content::text("Path not allowed")]));
-    }
+    let safe_path = match config.resolve_safe_path(&input.path) {
+        Some(p) => p,
+        None => return Ok(CallToolResult::error(vec![Content::text("Path not allowed")])),
+    };
     
-    let path = std::path::Path::new(&input.path);
-    if !path.exists() {
+    if !safe_path.exists() {
         return Ok(CallToolResult::error(vec![Content::text("Path does not exist")]));
     }
     
-    if path.is_dir() {
-        fs::remove_dir_all(path)?;
+    if safe_path.is_dir() {
+        fs::remove_dir_all(&safe_path)?;
         Ok(CallToolResult::success(vec![Content::text("Directory deleted successfully")]))
     } else {
-        fs::remove_file(path)?;
+        fs::remove_file(&safe_path)?;
         Ok(CallToolResult::success(vec![Content::text("File deleted successfully")]))
     }
 }
@@ -98,10 +102,15 @@ pub struct MoveFileInput {
 }
 
 pub async fn move_file(config: &SandboxConfig, input: MoveFileInput) -> Result<CallToolResult> {
-    if !config.is_path_allowed(&input.source) || !config.is_path_allowed(&input.destination) {
-        return Ok(CallToolResult::error(vec![Content::text("Path not allowed")]));
-    }
+    let safe_source = match config.resolve_safe_path(&input.source) {
+        Some(p) => p,
+        None => return Ok(CallToolResult::error(vec![Content::text("Path not allowed")])),
+    };
+    let safe_destination = match config.resolve_safe_path(&input.destination) {
+        Some(p) => p,
+        None => return Ok(CallToolResult::error(vec![Content::text("Path not allowed")])),
+    };
     
-    fs::rename(&input.source, &input.destination)?;
+    fs::rename(safe_source, safe_destination)?;
     Ok(CallToolResult::success(vec![Content::text("File/Directory moved successfully")]))
 }

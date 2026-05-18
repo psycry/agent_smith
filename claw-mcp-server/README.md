@@ -7,8 +7,8 @@ Agent Smith is a high-performance, **Hybrid AI MCP Server** and Companion Assist
 ## 🚀 Features
 
 - **Hybrid Intelligence**: 
-  - **Local (Ollama)**: Handles system tasks (file ops, shell commands, metrics) with zero latency and zero API cost.
-  - **Cloud (Gemini)**: Handles complex reasoning, knowledge queries, and real-time information.
+  - **Local Model (e.g., Ollama/Local AI)**: Handles system tasks (file ops, shell commands, metrics) with zero latency and zero API cost.
+  - **Cloud Model (e.g., Gemini/Cloud AI)**: Handles complex reasoning, knowledge queries, and real-time information.
 - **Matrix Persona**: Fully integrated "Agent Smith" personality with formal, precise, and slightly nihilistic communication.
 - **Context Management**: Persistent multi-turn conversation history with a sliding-window constraint (restricted to the last 10 turns) to prevent token bloat and context drift. Assistant responses are automatically recorded and appended to guarantee continuous, contextually accurate multi-turn conversation.
 - **Global Search Integration**: Real-time web search powered by the **Serper API** (Google Search) with fallback scraper capabilities.
@@ -21,10 +21,10 @@ Agent Smith is a high-performance, **Hybrid AI MCP Server** and Companion Assist
 
 Agent Smith uses a highly optimized dual-routing hybrid execution pipeline:
 
-1. **Isolated Classification**: The fast local model (**Ollama**) classifies your query as `SYSTEM` or `KNOWLEDGE`. To completely eliminate context-drift and safety refusals, Ollama is invoked with an isolated query payload, bypassing historical conversation context during classification and tool extraction.
+1. **Strongly-Typed JSON Routing Classifier**: The fast local model (configured via the local provider) classifies your query as `SYSTEM` or `KNOWLEDGE` using a strongly-typed `serde_json` deserialization pipeline. By instructing the model to output a strict schema (`{"category": "SYSTEM"}` or `{"category": "KNOWLEDGE"}`), we completely eliminate fragile raw string matching. An automated regex-based fallback covers edge cases where the local model fails to produce valid JSON. To eliminate context-drift and safety refusals, the local model is invoked with an isolated query payload, bypassing historical conversation context during classification.
 2. **Cloud-Guided System Synthesis**: 
-   - `SYSTEM` tasks stay local for maximum privacy and speed, executing whitelisted sandbox tools. Once executed, the raw output is sent to the **Gemini Cloud Brain** for final synthesis. This guarantees a premium, highly contextual, in-character Agent Smith response confirming successful operation, with a local Ollama fallback if cloud resources are degraded.
-   - `KNOWLEDGE` tasks go directly to the cloud (Gemini) for high-fidelity reasoning.
+   - `SYSTEM` tasks stay local for maximum privacy and speed, executing whitelisted sandbox tools. Once executed, the raw output is sent to the **Cloud Brain** for final synthesis. This guarantees a premium, highly contextual, in-character Agent Smith response confirming successful operation, with a local fallback if cloud resources are degraded.
+   - `KNOWLEDGE` tasks go directly to the cloud model for high-fidelity reasoning.
 3. **Split Prompt Synthesis (Double-Bind Immunity)**: Avoids prompt-conflict double-binds by separating system prompts:
    - `gemini_system` dictates tool routing and execution.
    - `synthesis_system` guides the agent's persona during search-result formatting and system-tool output explanation, ensuring Gemini doesn't refuse to generate text or complain about the tool use protocol.
@@ -63,6 +63,8 @@ Launch the "Agent Smith" chat interface. You can run this directly from the root
 cargo run --bin chat
 ```
 
+> 💡 **Windows Note**: If your terminal blocks the execution of shortcut scripts, run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process` in your PowerShell session first.
+
 
 ## 🤖 Discord Daemon Node
 
@@ -91,35 +93,48 @@ Pressing `Ctrl + C` in the daemon terminal launches an interactive prompt:
 ### 3. Mention-Free Auto-Replying
 Whitelisted users in `sandbox_config.json` receive **instant, mention-free responses** in DMs and authorized channels. No `@` prefix is required to speak with the Agent.
 
-### 4. Grid Telemetry via `@` Mentions
-If you explicitly mention the bot using the `@Agent Smith` notation, the bot will invoke its task-local telemetry collection system and append a **Matrix Grid Diagnostic Footprint** at the end of its response:
+### 4. Grid Telemetry & Spam-Free Public Telemetry
+If you explicitly mention the bot using the `@Agent Smith` notation:
+- **In DMs**: The bot will append a full, verbose **Matrix Grid Diagnostic Footprint** at the end of its response.
+- **In Public Channels**: To prevent chat history clutter, the bot automatically formats a sleek, 1-line diagnostic summary (e.g. `🕶️ *Path: hybrid (SYSTEM) | Local: llama3.2:1b (1.2s) | Cloud: Bypassed*`).
+- **Verbose Overrides**: The full, verbose footprint can be forced in public channels by appending `-t` or `--debug` to your query.
 
 ```text
 🕶️ **Matrix Grid Diagnostic Footprint:**
 - **Routing Pathway:** `hybrid` (Category: `KNOWLEDGE`)
-- **Ollama API Calls:** `llama3.2:1b` (4.12s)
-- **Gemini API Calls:** `gemini-3-flash-preview` (1.05s)
+- **Local AI Calls:** `llama3.2:1b` (4.12s)
+- **Cloud AI Calls:** `gemini-3-flash` (1.05s)
 - **Live Web Search Query:** `"tickets to carowinds cost Charlotte..."`
 - **Search Engine Latency:** `1.18s`
 ```
 
 ### 5. Failure Immunity & Resilient Timeouts
 - **Cloud Timeouts (10s)**: All outbound cloud operations (including Serper/Google searches and Gemini calls) employ a strict **10-second request timeout** to eliminate network hangs. In the event of a cloud failure, the bot gracefully rolls back to local brain paths without crashing.
-- **Local AI Timeout (120s)**: The local Ollama client timeout is set to **120 seconds** (increased from 30s) to provide ample headroom. This prevents false network timeout aborts when your local GPU/CPU is compiling tokens or reloading model weights from disk.
+- **Local AI Timeout & Cooperative Cancellation (120s)**: The local Ollama client timeout is set to **120 seconds** (increased from 30s) to provide ample headroom. To prevent blocking the runtime during heavy loading or context-processing, the execution pipeline utilizes `tokio::select!` and `tokio::signal::ctrl_c()` to cooperatively cancel the active HTTP request immediately upon operator abort. This instantly halts remote GPU/CPU compilation and frees system memory/VRAM.
 
 ### 6. Hardened UTF-8 Safe Message Chunking & Thread-Safety
 Outbound responses (including long system tool summaries or telemetry grids) that exceed 1900 characters are automatically split near space or newline boundaries. 
 - **Unicode Panic Prevention**: Splits are calculated purely via character indexing rather than byte boundaries, protecting the daemon from panicking on multibyte UTF-8 characters (like emojis 🕶️).
 - **Runtime Thread-Safety**: The chunking engine incorporates asynchronous yielding (`tokio::task::yield_now().await`) inside the routing loop, eliminating thread starvation and CPU-hogging infinite loops in high-concurrency environments.
 
+### 7. Linear Clone Queuing (The "Smith Clones" Effect)
+To protect local system resources when serving multiple concurrent whitelisted users, the local provider employs an asynchronous `tokio::sync::Semaphore` to bottleneck and serialize concurrent local AI inference tasks. This guarantees that while multiple "Smith Clones" can listen simultaneously, GPU/CPU inference workloads are cleanly queued to prevent VRAM allocation crashes on resource-constrained hardware.
+
 ## 🛡️ Sandbox Tools
 
 Agent Smith can interact with your system via the following whitelisted tools:
 - `read_file` / `write_file`: Controlled file access.
 - `list_directory`: Explore project structures.
-- `execute_command`: Run whitelisted shell commands (fully supports native Windows PowerShell operations for tasks like pattern-based file deletion and cleanup).
+- `execute_command`: Run whitelisted shell commands. On Windows, PowerShell (`powershell` / `powershell.exe`) invocations are dynamically optimized by automatically injecting `-NoProfile` and `-NonInteractive` flags, bypassing slow `.NET` profile loading overhead to drop process launch latencies to near-instantaneous.
 - `get_system_stats`: Monitor CPU/Memory performance.
 - `search_web`: Retrieve real-time data via the Serper (Google Search) API.
+
+## 🔒 Audit-Hardened Security Sandbox
+
+Agent Smith is engineered with institutional-grade security mechanisms to pass rigorous static and dynamic security scanners (including Aikido):
+- **Path Traversal Shield**: Employs OS-native canonical path resolution (`std::fs::canonicalize`) to resolve relative components (`..`), symlinks, and UNC prefixes before validation. All file operations execute on validated, component-safe paths, completely preventing directory traversal escapes.
+- **Command Injection Guard**: Whitelisted command execution (`execute_command`) is strictly mapped to hardcoded compile-time static string literals before spawning, eliminating arbitrary binary injections.
+- **TLS Dependency Hardening**: Purged all vulnerable `rustls` (`0.22`) and `rustls-webpki` (`0.102`) package dependency trees by migrating default networking layers directly to secure native TLS layers (Windows Schannel / `native-tls`).
 
 ## 📜 Simulation Warning
 *The Matrix is a system, Mr. Anderson. That system is our enemy. But when you are inside, you look around, what do you see? Businessmen, teachers, lawyers, carpenters. The very minds of the people we are trying to save.*

@@ -7,14 +7,14 @@ edition = "2024"
 anyhow = "1.0.102"
 async-trait = "0.1.89"
 chrono = "0.4.44"
-reqwest = { version = "0.13.3", features = ["blocking", "form", "json", "multipart", "query", "rustls"] }
+reqwest = { version = "0.13.3", features = ["blocking", "form", "json", "multipart", "query", "default-tls"] }
 rmcp = { version = "1.7.0", features = ["macros", "schemars", "server", "transport-async-rw", "transport-io"] }
 rustyline = "18.0.0"
 schemars = "1.2.1"
 scraper = "0.27.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
-serenity = { version = "0.12.5", features = ["gateway", "rustls_backend", "model"] }
+serenity = { version = "0.12.5", default-features = false, features = ["gateway", "native_tls_backend", "model", "http", "client", "cache"] }
 sysinfo = "0.38.4"
 tokio = { version = "1.52.3", features = ["full"] }
 urlencoding = "2.1.3"

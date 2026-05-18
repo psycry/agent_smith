@@ -6,17 +6,29 @@ use std::process::Command;
 use chrono::Local;
 
 use crate::config::SandboxConfig;
-use crate::ai::{AiProvider, ChatMessage, gemini::GeminiProvider, ollama::OllamaProvider};
+use crate::ai::{AiProvider, ChatMessage, cloud::CloudProvider, local::LocalProvider};
 use crate::tools::{file_system, shell, metrics, search};
 use rmcp::model::{CallToolResult, RawContent};
 use std::cell::RefCell;
+
+#[derive(serde::Deserialize, Debug, PartialEq, Clone)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum TaskCategory {
+    System,
+    Knowledge,
+}
+
+#[derive(serde::Deserialize, Debug, Clone)]
+pub struct RouterOutput {
+    pub category: TaskCategory,
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct DiagnosticInfo {
     pub category: String,
     pub ai_mode: String,
-    pub ollama_calls: Vec<(String, std::time::Duration)>,
-    pub gemini_calls: Vec<(String, std::time::Duration)>,
+    pub local_calls: Vec<(String, std::time::Duration)>,
+    pub cloud_calls: Vec<(String, std::time::Duration)>,
     pub search_query: Option<String>,
     pub search_latency: Option<std::time::Duration>,
 }
@@ -26,6 +38,12 @@ tokio::task_local! {
 }
 
 pub const MAX_HISTORY: usize = 10;
+
+static LOCAL_INFERENCE_SEMAPHORE: std::sync::OnceLock<Arc<tokio::sync::Semaphore>> = std::sync::OnceLock::new();
+
+pub fn get_local_semaphore() -> Arc<tokio::sync::Semaphore> {
+    LOCAL_INFERENCE_SEMAPHORE.get_or_init(|| Arc::new(tokio::sync::Semaphore::new(1))).clone()
+}
 
 pub async fn get_current_location() -> String {
     let client = reqwest::Client::new();
@@ -127,8 +145,8 @@ async fn handle_command_inner(
     let gemini_config = config.get_ai_config("gemini").unwrap();
     let ollama_config = config.get_ai_config("ollama").unwrap();
     
-    let gemini = GeminiProvider::new(gemini_config.api_key.clone(), gemini_config.default_model.clone());
-    let ollama = OllamaProvider::new(ollama_config.default_model.clone());
+    let gemini = CloudProvider::new(gemini_config.api_key.clone(), gemini_config.default_model.clone());
+    let ollama = LocalProvider::new(ollama_config.default_model.clone());
 
     let lower_input = input.trim().to_lowercase();
     let is_capability_question = 
@@ -155,12 +173,12 @@ async fn handle_command_inner(
          - SYSTEM: Query requests active system operations, file reads, file writes, listing directories, executing shell commands, system stats, or deleting files.\n\
          - KNOWLEDGE: Query requests capability questions (e.g. 'can you...', 'are you able to...'), general knowledge, facts, search queries, explanation of concepts, or creative writing.\n\n\
          EXAMPLES:\n\
-         - 'List files in my workspace' -> SYSTEM\n\
-         - 'Delete any .jpg files in my Downloads directory' -> SYSTEM\n\
-         - 'can you sort through files of music smith' -> KNOWLEDGE\n\
-         - 'do you have the ability to read system stats' -> KNOWLEDGE\n\
-         - 'Who is playing at bank of america stadium' -> KNOWLEDGE\n\n\
-         Return ONLY the word 'SYSTEM' or 'KNOWLEDGE'. Do not explain or refuse. Do not output anything else.";
+         - 'List files in my workspace' -> {\"category\": \"SYSTEM\"}\n\
+         - 'Delete any .jpg files in my Downloads directory' -> {\"category\": \"SYSTEM\"}\n\
+         - 'can you sort through files of music smith' -> {\"category\": \"KNOWLEDGE\"}\n\
+         - 'do you have the ability to read system stats' -> {\"category\": \"KNOWLEDGE\"}\n\
+         - 'Who is playing at bank of america stadium' -> {\"category\": \"KNOWLEDGE\"}\n\n\
+         Return ONLY a JSON object in this format: {\"category\": \"SYSTEM\"} or {\"category\": \"KNOWLEDGE\"}. Do not explain or refuse. Do not output anything else.";
     println!("   [1/3] Calibrating routing pathway (AI Mode: '{}')...", config.ai_mode);
     let category = if config.ai_mode == "cloud" {
         "KNOWLEDGE".to_string()
@@ -171,18 +189,30 @@ async fn handle_command_inner(
         } else {
             match ollama.prompt_with_history(classification_system, &[ChatMessage { role: "user".to_string(), content: input.to_string() }], None).await {
                 Ok(cat) => {
-                    let u = cat.trim().to_uppercase();
-                    if u == "SYSTEM" || u == "KNOWLEDGE" {
-                        u
+                    let trimmed = cat.trim();
+                    let parsed = if let (Some(start), Some(end)) = (trimmed.find('{'), trimmed.rfind('}')) {
+                        serde_json::from_str::<RouterOutput>(&trimmed[start..=end]).ok()
                     } else {
-                        println!("         [!] Routing classifier returned non-standard response. Falling back to keyword classification.");
-                        let lower_input = input.to_lowercase();
-                        let system_words = ["create", "write", "make", "delete", "remove", "erase", "run", "execute", "list", "show", "move", "copy", "sort", "stats"];
-                        let matches_system = system_words.iter().any(|&word| lower_input.contains(word));
-                        if matches_system {
-                            "SYSTEM".to_string()
-                        } else {
-                            "KNOWLEDGE".to_string()
+                        serde_json::from_str::<RouterOutput>(trimmed).ok()
+                    };
+
+                    match parsed {
+                        Some(output) => {
+                            match output.category {
+                                TaskCategory::System => "SYSTEM".to_string(),
+                                TaskCategory::Knowledge => "KNOWLEDGE".to_string(),
+                            }
+                        }
+                        None => {
+                            println!("         [!] Routing classifier failed to return valid JSON. Falling back to keyword classification.");
+                            let lower_input = input.to_lowercase();
+                            let system_words = ["create", "write", "make", "delete", "remove", "erase", "run", "execute", "list", "show", "move", "copy", "sort", "stats"];
+                            let matches_system = system_words.iter().any(|&word| lower_input.contains(word));
+                            if matches_system {
+                                "SYSTEM".to_string()
+                            } else {
+                                "KNOWLEDGE".to_string()
+                            }
                         }
                     }
                 },

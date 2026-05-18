@@ -1,5 +1,5 @@
 use crate::config::SandboxConfig;
-use crate::ai::{AiProvider, gemini::GeminiProvider, ollama::OllamaProvider, ChatMessage};
+use crate::ai::{AiProvider, cloud::CloudProvider, local::LocalProvider, ChatMessage};
 use anyhow::Result;
 use serde::Deserialize;
 use schemars::JsonSchema;
@@ -17,8 +17,8 @@ pub async fn ask_ai(config: &SandboxConfig, input: AskAiInput) -> Result<CallToo
         .ok_or_else(|| anyhow::anyhow!("AI Provider '{}' not configured", input.provider))?;
 
     let provider: Box<dyn AiProvider> = match input.provider.as_str() {
-        "gemini" => Box::new(GeminiProvider::new(ai_config.api_key.clone(), ai_config.default_model.clone())),
-        "ollama" => Box::new(OllamaProvider::new(ai_config.default_model.clone())),
+        "gemini" => Box::new(CloudProvider::new(ai_config.api_key.clone(), ai_config.default_model.clone())),
+        "ollama" => Box::new(LocalProvider::new(ai_config.default_model.clone())),
         _ => return Err(anyhow::anyhow!("Unknown AI Provider")),
     };
 
