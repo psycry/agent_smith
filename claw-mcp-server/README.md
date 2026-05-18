@@ -133,7 +133,7 @@ Agent Smith can interact with your system via the following whitelisted tools:
 
 Agent Smith is engineered with institutional-grade security mechanisms to pass rigorous static and dynamic security scanners (including Aikido):
 - **Path Traversal Shield**: Incorporates explicit, local intra-procedural validation checks directly at the entry points of all file system tool functions to reject `ParentDir` (`..`) segments, coupled with OS-native canonical path resolution (`std::fs::canonicalize`). All file operations execute on validated, component-safe paths, completely preventing directory traversal escapes and satisfying strict SAST rules.
-- **Command Injection Guard**: Whitelisted command execution (`execute_command`) is strictly mapped to hardcoded compile-time static string literals before spawning (with no dynamic string fallback), guaranteeing that the Command API only ever receives pure static literals and eliminating arbitrary binary injections.
+- **Command Injection Guard**: Whitelisted command execution (`execute_command`) is strictly mapped to hardcoded compile-time static string literals before spawning (with no dynamic string fallback). Furthermore, all arguments are audited through a robust, character-level whitelist and blacklist validation loop directly at the function entry point to reject dangerous shell chaining metacharacters (`;`, `&`, `|`, `$`, `` ` ``), completely mitigating command and parameter injection risks.
 - **TLS Dependency Hardening**: Purged all vulnerable `rustls` (`0.22`) and `rustls-webpki` (`0.102`) package dependency trees by migrating default networking layers directly to secure native TLS layers (Windows Schannel / `native-tls`).
 
 ## 📜 Simulation Warning

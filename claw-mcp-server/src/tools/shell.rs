@@ -16,6 +16,31 @@ pub async fn execute_command(config: &SandboxConfig, input: ExecuteCommandInput)
         return Ok(CallToolResult::error(vec![Content::text("Command not allowed")]));
     }
 
+    // Validate each argument to block parameter injection or command chaining metacharacters
+    for arg in &input.args {
+        let is_safe = arg.chars().all(|c| {
+            c.is_alphanumeric()
+                || c == '-'
+                || c == '_'
+                || c == '.'
+                || c == '/'
+                || c == '\\'
+                || c == ' '
+                || c == '='
+                || c == ':'
+                || c == '*'
+                || c == '?'
+                || c == '"'
+                || c == '\''
+                || c == ','
+                || c == '+'
+        });
+
+        if !is_safe || arg.contains(';') || arg.contains('&') || arg.contains('|') || arg.contains('$') || arg.contains('`') || arg.contains('\n') || arg.contains('\r') {
+            return Ok(CallToolResult::error(vec![Content::text("Argument validation failed: unauthorized characters in command arguments")]));
+        }
+    }
+
     // Resolve static analysis warning by mapping target command strictly to hardcoded literals
     let command_path = match input.command.as_str() {
         "git" => "git",
