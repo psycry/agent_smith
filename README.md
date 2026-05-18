@@ -1,7 +1,7 @@
 # 🕶️ Agent Smith (Claw MCP Server)
 
 <p align="center">
-  <img src="../Agent_Smith.png" alt="Agent Smith" width="100%">
+  <img src="./Agent_Smith.png" alt="Agent Smith" width="100%">
 </p>
 
 > *"It is inevitable, Mr. Anderson."*
