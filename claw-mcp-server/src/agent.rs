@@ -132,7 +132,6 @@ async fn handle_command_inner(
 
     let lower_input = input.trim().to_lowercase();
     let is_capability_question = 
-        lower_input.starts_with("can you") || 
         lower_input.starts_with("do you have") || 
         lower_input.starts_with("are you able to") || 
         lower_input.starts_with("is it possible for you") || 
