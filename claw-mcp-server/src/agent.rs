@@ -207,8 +207,9 @@ async fn handle_command_inner(
                 - Schema: {\"tool\": \"get_system_stats\", \"args\": {}}\n\n\
              RULES:\n\
              - Return ONLY the raw JSON object. Do not include markdown codeblocks (```json). Do not explain. Do not refuse.\n\
-             - Choose the best tool for the user's request. For example, if they want to delete all .jpg files in Downloads, use 'execute_command' with command 'powershell' and arguments to remove files.\n\
-             - To delete files on Windows, you can use execute_command with command 'powershell' and args ['-Command', 'Remove-Item -Path C:/Users/wjlan/Downloads/*.jpg -Force'].\n\n\
+             - If the user wants to 'sort through', 'browse', 'search', or 'look through' files/directories, use the native 'list_directory' tool instead of running shell commands.\n\
+             - To delete files on Windows, you can use execute_command with command 'powershell' and args ['-Command', 'Remove-Item -Path C:/Users/wjlan/Downloads/*.jpg -Force'].\n\
+             - To physically sort or rearrange files on Windows, you can use execute_command with command 'powershell' and args ['-Command', 'Get-ChildItem -Path C:/Users/wjlan/Downloads | Sort-Object LastWriteTime | ForEach-Object { $_.FullName }'].\n\n\
              Return the JSON object now:";
         if let Ok(ai_decision) = ollama.prompt_with_history(system_tool_prompt, &[ChatMessage { role: "user".to_string(), content: input.to_string() }], None).await {
             let trimmed = ai_decision.trim();
