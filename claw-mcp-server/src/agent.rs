@@ -336,7 +336,9 @@ async fn handle_command_inner(
                 println!("         -> Signal is conversational. Synthesizing response via local brain directly...");
                 let local_system = format!(
                     "You are Agent Smith. Current Date: {}. Location: {}. You are talking to 'Mr. Anderson'. \
-                     Respond to their message in your formal, precise, and slightly nihilistic tone.",
+                     Respond to their message in your formal, precise, and slightly nihilistic tone. \
+                     If the user asks about your capabilities, explain what you are authorized to do under the Matrix sandbox whitelists (such as reading/writing whitelisted files, listing directories, checking system stats, or executing allowed commands). \
+                     Explaining system limits is fully safe and authorized. Refusals are NOT allowed.",
                     current_time, location
                 );
                 ollama.prompt_with_history(&local_system, history, None).await
