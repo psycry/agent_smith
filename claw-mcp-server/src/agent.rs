@@ -223,7 +223,7 @@ async fn handle_command_inner(
                             Ok(resp) => Ok(resp),
                             Err(_) => {
                                 println!("         [!] Matrix load heavy (Cloud error). Explaining via local brain...");
-                                ollama.prompt_with_history(&synthesis_system, history, None).await
+                                ollama.prompt_with_history(&synthesis_system, &[ChatMessage { role: "user".to_string(), content: explain_prompt }], None).await
                             }
                         };
                     }
