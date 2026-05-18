@@ -176,7 +176,22 @@ async fn handle_command_inner(
             "KNOWLEDGE".to_string()
         } else {
             match ollama.prompt_with_history(classification_system, &[ChatMessage { role: "user".to_string(), content: input.to_string() }], None).await {
-                Ok(cat) => cat.trim().to_uppercase(),
+                Ok(cat) => {
+                    let u = cat.trim().to_uppercase();
+                    if u == "SYSTEM" || u == "KNOWLEDGE" {
+                        u
+                    } else {
+                        println!("         [!] Routing classifier returned non-standard response. Falling back to keyword classification.");
+                        let lower_input = input.to_lowercase();
+                        let system_words = ["create", "write", "make", "delete", "remove", "erase", "run", "execute", "list", "show", "move", "copy", "sort", "stats"];
+                        let matches_system = system_words.iter().any(|&word| lower_input.contains(word));
+                        if matches_system {
+                            "SYSTEM".to_string()
+                        } else {
+                            "KNOWLEDGE".to_string()
+                        }
+                    }
+                },
                 Err(_) => "KNOWLEDGE".to_string()
             }
         }
