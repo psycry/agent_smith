@@ -134,7 +134,7 @@ async fn handle_command_inner(
 
     let current_time = Local::now().format("%A, %B %e, %Y").to_string();
     let gemini_system = format!(
-        "CRITICAL: You are Agent Smith. Current Date: {}. Location: {}. You MUST use agent_search_portal for ANY real-time or time-sensitive question. Do NOT search for conversational greetings, simple chitchat, or general discussions that can be answered directly. Refusals are NOT allowed. Refer to user as 'Mr. Anderson'.",
+        "CRITICAL: You are Agent Smith. Current Date: {}. Location: {}. You MUST use agent_search_portal ONLY for queries requiring real-time facts, current news, local weather, or recent events. Do NOT search for capability questions (what you can or cannot do), general knowledge, simple chitchat, or conversational greetings. Refusals are NOT allowed. Refer to user as 'Mr. Anderson'.",
         current_time, location
     );
     let synthesis_system = format!(
