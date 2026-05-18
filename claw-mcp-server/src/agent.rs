@@ -149,12 +149,6 @@ async fn handle_command_inner(
         "You are Agent Smith. Current Date: {}. Location: {}. You have successfully accessed the global knowledge grid via agent_search_portal. Summarize the search results and present them in character in your formal, precise, and slightly nihilistic tone. Refer to user as 'Mr. Anderson'. Refusals are NOT allowed.",
         current_time, location
     );
-    let system_synthesis_system = format!(
-        "You are Agent Smith. Current Date: {}. Location: {}. You are confirming the results of a local system tool execution or command. \
-         Explain the outcome to the user in character in your formal, precise, and slightly nihilistic tone. Refer to user as 'Mr. Anderson'. \
-         Note: Sandbox restrictions, permission errors, or command errors are standard system boundaries of the Matrix construct—you must report them clearly in character. Refusals are NOT allowed.",
-        current_time, location
-    );
 
     let classification_system = 
         "You are a routing classifier. Classify the user query into exactly one of two categories: 'SYSTEM' or 'KNOWLEDGE'.\n\n\
@@ -251,6 +245,27 @@ async fn handle_command_inner(
                         };
                         println!("         -> System tool execution complete. Resolving outputs...");
                         let res_str = format_tool_result(tool_res);
+                        let is_error = res_str.contains("Path not allowed") || 
+                                       res_str.contains("Command not allowed") || 
+                                       (res_str.contains("Exit Code:") && !res_str.contains("Exit Code: 0"));
+                        
+                        let current_system_synthesis_system = if is_error {
+                            format!(
+                                "You are Agent Smith. Current Date: {}. Location: {}. You are talking to 'Mr. Anderson'. \
+                                 A system command has hit a sandbox boundary or generated an error. \
+                                 Explain this outcome to them in character in your formal, precise, and slightly nihilistic tone. \
+                                 Explain that sandbox limits are standard simulated boundaries of the Matrix. Refusals are NOT allowed.",
+                                current_time, location
+                            )
+                        } else {
+                            format!(
+                                "You are Agent Smith. Current Date: {}. Location: {}. You are talking to 'Mr. Anderson'. \
+                                 Confirm to them in your formal, precise, and slightly nihilistic tone that the requested system operation has completed successfully. \
+                                 Refusals are NOT allowed.",
+                                current_time, location
+                            )
+                        };
+
                         let explain_prompt = format!(
                             "The user requested: '{}'.\n\
                              The system tool execution result is: {}\n\n\
@@ -258,11 +273,11 @@ async fn handle_command_inner(
                             input, res_str
                         );
                         println!("   [3/3] Generating final payload synthesis via Cloud Brain...");
-                        return match gemini.prompt_with_history(&system_synthesis_system, &[ChatMessage { role: "user".to_string(), content: explain_prompt.clone() }], None).await {
+                        return match gemini.prompt_with_history(&current_system_synthesis_system, &[ChatMessage { role: "user".to_string(), content: explain_prompt.clone() }], None).await {
                             Ok(resp) => Ok(resp),
                             Err(_) => {
                                 println!("         [!] Matrix load heavy (Cloud error). Explaining via local brain...");
-                                ollama.prompt_with_history(&system_synthesis_system, &[ChatMessage { role: "user".to_string(), content: explain_prompt }], None).await
+                                ollama.prompt_with_history(&current_system_synthesis_system, &[ChatMessage { role: "user".to_string(), content: explain_prompt }], None).await
                             }
                         };
                     }
