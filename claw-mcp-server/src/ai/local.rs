@@ -10,15 +10,34 @@ pub struct LocalProvider {
     model: String,
     client: Client,
     url: String,
+    is_openai_compat: bool,
 }
 
 impl LocalProvider {
-    pub fn new(model: String) -> Self {
+    pub fn new(model: String, base_url: Option<String>) -> Self {
+        let mut base_url = base_url.unwrap_or_else(|| "http://localhost:11434".to_string());
+        if base_url.ends_with('/') {
+            base_url.pop();
+        }
+        
+        let is_openai_compat = base_url != "http://localhost:11434" && !base_url.contains("11434");
+        
+        let url = if is_openai_compat {
+            if base_url.ends_with("/chat/completions") {
+                base_url
+            } else {
+                format!("{}/chat/completions", base_url)
+            }
+        } else {
+            format!("{}/api/chat", base_url)
+        };
+
         Self {
             model,
             // 120 second timeout - allows local model load times on various hardware under load
             client: Client::builder().timeout(Duration::from_secs(120)).build().unwrap(),
-            url: "http://localhost:11434/api/chat".to_string(),
+            url,
+            is_openai_compat,
         }
     }
 }
@@ -66,9 +85,15 @@ impl AiProvider for LocalProvider {
             }
 
             let json_resp: serde_json::Value = response.json().await?;
-            let text = json_resp["message"]["content"]
-                .as_str()
-                .ok_or_else(|| anyhow!("Failed to parse response from local AI chat"))?;
+            let text = if self.is_openai_compat {
+                json_resp["choices"][0]["message"]["content"]
+                    .as_str()
+                    .ok_or_else(|| anyhow!("Failed to parse response from OpenAI-compatible local AI completions"))?
+            } else {
+                json_resp["message"]["content"]
+                    .as_str()
+                    .ok_or_else(|| anyhow!("Failed to parse response from local AI chat"))?
+            };
             
             Ok(text.to_string())
         };

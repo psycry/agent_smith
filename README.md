@@ -37,7 +37,7 @@ Agent Smith uses a highly optimized dual-routing hybrid execution pipeline:
 
 ### 1. Prerequisites
 - **Rust**: Installed on your machine.
-- **Local Model**: A local model provider (e.g., Ollama, LocalAI) for the local routing layer.
+- **Local Model**: A local model provider (e.g., Ollama, LM Studio, vLLM, LocalAI) for the local routing layer.
 - **Cloud API Key**: Required for cloud knowledge queries (e.g., Gemini, Anthropic, OpenAI).
 
 ### 2. Configuration
@@ -48,10 +48,37 @@ Update `sandbox_config.json` with your API key and allowed paths:
   "allowed_paths": ["C:/Users/YourName/Projects"],
   "allowed_commands": ["git", "ls", "cargo"],
   "ai_providers": {
-    "gemini": { "api_key": "YOUR_KEY_HERE" }
+    "gemini": { 
+      "api_key": "YOUR_KEY_HERE",
+      "default_model": "gemini-1.5-flash"
+    },
+    "ollama": {
+      "default_model": "qwen2.5-coder:7b",
+      "api_key": ""
+    }
   }
 }
 ```
+
+#### 🔌 Using Alternative Local Backends (LM Studio, vLLM, LocalAI)
+You can seamlessly swap out Ollama for any OpenAI-compatible local inference API server by providing the optional `base_url` property under the `ollama` provider block:
+
+```json
+{
+  "ai_providers": {
+    "ollama": {
+      "default_model": "qwen2.5-coder-7b-instruct",
+      "api_key": "",
+      "base_url": "http://localhost:1234/v1"
+    }
+  }
+}
+```
+
+When a custom `base_url` is configured:
+1. **OpenAI-Compatible Routing**: Requests are sent to the standard `/v1/chat/completions` path, and response parsing switches to extract the text output from the `choices[0].message.content` property.
+2. **Automatic Daemon Bypass**: The server automatically detects the custom endpoint and **completely bypasses** all Ollama-specific shell checks (`where`/`which` checks, starting the local `ollama serve` daemon, and running `ollama pull`), ensuring instant and error-free start-up.
+3. **Experimental Status Warning**: Support for third-party local backends is experimental and has not been heavily tested yet. Ensure your custom model is capable of outputting a strict JSON classifier payload (for router classification) to guarantee functional parity.
 
 ### 3. Run the Assistant
 Launch the "Agent Smith" chat interface. You can run this directly from the root workspace directory using the convenience shortcuts:

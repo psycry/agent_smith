@@ -8,6 +8,7 @@ use std::collections::HashMap;
 pub struct AiConfig {
     pub api_key: String,
     pub default_model: String,
+    pub base_url: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

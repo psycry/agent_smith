@@ -220,7 +220,7 @@ async fn main() -> anyhow::Result<()> {
 
     if config.ai_mode == "hybrid" {
         let ollama_config = config.get_ai_config("ollama").unwrap();
-        let _ = ensure_ollama_setup(&ollama_config.default_model).await;
+        let _ = ensure_ollama_setup(&ollama_config.default_model, ollama_config.base_url.as_deref()).await;
     }
 
     let intents = GatewayIntents::GUILD_MESSAGES

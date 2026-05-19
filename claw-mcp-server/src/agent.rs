@@ -60,7 +60,14 @@ pub async fn get_current_location() -> String {
     "Unknown Location".to_string()
 }
 
-pub async fn ensure_ollama_setup(model: &str) -> anyhow::Result<()> {
+pub async fn ensure_ollama_setup(model: &str, base_url: Option<&str>) -> anyhow::Result<()> {
+    if let Some(url) = base_url {
+        if url != "http://localhost:11434" && !url.contains("11434") {
+            println!("-> Custom local AI endpoint detected ({}). Bypassing automated Ollama startup & pull checks.", url);
+            return Ok(());
+        }
+    }
+
     print!("-> Checking local AI status ({})... ", model);
     io::stdout().flush()?;
 
@@ -146,7 +153,7 @@ async fn handle_command_inner(
     let ollama_config = config.get_ai_config("ollama").unwrap();
     
     let gemini = CloudProvider::new(gemini_config.api_key.clone(), gemini_config.default_model.clone());
-    let ollama = LocalProvider::new(ollama_config.default_model.clone());
+    let ollama = LocalProvider::new(ollama_config.default_model.clone(), ollama_config.base_url.clone());
 
     let lower_input = input.trim().to_lowercase();
     let is_capability_question = 
