@@ -87,12 +87,11 @@ impl EventHandler for Handler {
         println!("[GRID MONITOR] Message from {} (ID: {}): {}", msg.author.name, msg.author.id, msg.content);
 
         // 2. Check Whitelist
-        if let Some(whitelist) = &self.config.discord_whitelist {
-            if !whitelist.contains(&msg.author.id.get()) {
+        if let Some(whitelist) = &self.config.discord_whitelist
+            && !whitelist.contains(&msg.author.id.get()) {
                 println!("   [!] Whitelist block. User ID {} is not authorized.", msg.author.id);
                 return;
             }
-        }
 
         let is_mentioned = msg.mentions_user_id(ctx.cache.current_user().id);
 

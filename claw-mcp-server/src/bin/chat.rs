@@ -1,6 +1,5 @@
 use std::io::{self, Write};
 use std::sync::Arc;
-use tokio;
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
 

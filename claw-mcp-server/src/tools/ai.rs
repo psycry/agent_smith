@@ -17,7 +17,11 @@ pub async fn ask_ai(config: &SandboxConfig, input: AskAiInput) -> Result<CallToo
         .ok_or_else(|| anyhow::anyhow!("AI Provider '{}' not configured", input.provider))?;
 
     let provider: Box<dyn AiProvider> = match input.provider.as_str() {
-        "gemini" => Box::new(CloudProvider::new(ai_config.api_key.clone(), ai_config.default_model.clone())),
+        "gemini" => Box::new(CloudProvider::new(
+            ai_config.api_key.clone(),
+            ai_config.default_model.clone(),
+            ai_config.fallback_models.clone().unwrap_or_default()
+        )),
         "ollama" => Box::new(LocalProvider::new(ai_config.default_model.clone(), ai_config.base_url.clone())),
         _ => return Err(anyhow::anyhow!("Unknown AI Provider")),
     };

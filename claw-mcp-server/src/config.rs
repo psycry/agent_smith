@@ -9,6 +9,7 @@ pub struct AiConfig {
     pub api_key: String,
     pub default_model: String,
     pub base_url: Option<String>,
+    pub fallback_models: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -47,26 +47,22 @@ pub fn get_local_semaphore() -> Arc<tokio::sync::Semaphore> {
 
 pub async fn get_current_location() -> String {
     let client = reqwest::Client::new();
-    match client.get("http://ip-api.com/json").send().await {
-        Ok(res) => {
-            if let Ok(json) = res.json::<serde_json::Value>().await {
-                let city = json["city"].as_str().unwrap_or("Unknown City");
-                let region = json["regionName"].as_str().unwrap_or("Unknown Region");
-                return format!("{}, {}", city, region);
-            }
+    if let Ok(res) = client.get("http://ip-api.com/json").send().await {
+        if let Ok(json) = res.json::<serde_json::Value>().await {
+            let city = json["city"].as_str().unwrap_or("Unknown City");
+            let region = json["regionName"].as_str().unwrap_or("Unknown Region");
+            return format!("{}, {}", city, region);
         }
-        Err(_) => {}
     }
     "Unknown Location".to_string()
 }
 
 pub async fn ensure_ollama_setup(model: &str, base_url: Option<&str>) -> anyhow::Result<()> {
-    if let Some(url) = base_url {
-        if url != "http://localhost:11434" && !url.contains("11434") {
+    if let Some(url) = base_url
+        && url != "http://localhost:11434" && !url.contains("11434") {
             println!("-> Custom local AI endpoint detected ({}). Bypassing automated Ollama startup & pull checks.", url);
             return Ok(());
         }
-    }
 
     print!("-> Checking local AI status ({})... ", model);
     io::stdout().flush()?;
@@ -152,7 +148,11 @@ async fn handle_command_inner(
     let gemini_config = config.get_ai_config("gemini").unwrap();
     let ollama_config = config.get_ai_config("ollama").unwrap();
     
-    let gemini = CloudProvider::new(gemini_config.api_key.clone(), gemini_config.default_model.clone());
+    let gemini = CloudProvider::new(
+        gemini_config.api_key.clone(),
+        gemini_config.default_model.clone(),
+        gemini_config.fallback_models.clone().unwrap_or_default()
+    );
     let ollama = LocalProvider::new(ollama_config.default_model.clone(), ollama_config.base_url.clone());
 
     let lower_input = input.trim().to_lowercase();
@@ -198,7 +198,11 @@ async fn handle_command_inner(
                 Ok(cat) => {
                     let trimmed = cat.trim();
                     let parsed = if let (Some(start), Some(end)) = (trimmed.find('{'), trimmed.rfind('}')) {
-                        serde_json::from_str::<RouterOutput>(&trimmed[start..=end]).ok()
+                        if start <= end {
+                            serde_json::from_str::<RouterOutput>(&trimmed[start..=end]).ok()
+                        } else {
+                            serde_json::from_str::<RouterOutput>(trimmed).ok()
+                        }
                     } else {
                         serde_json::from_str::<RouterOutput>(trimmed).ok()
                     };
@@ -272,9 +276,10 @@ async fn handle_command_inner(
              Return the JSON object now:";
         if let Ok(ai_decision) = ollama.prompt_with_history(system_tool_prompt, &[ChatMessage { role: "user".to_string(), content: input.to_string() }], None).await {
             let trimmed = ai_decision.trim();
-            if let (Some(start), Some(end)) = (trimmed.find('{'), trimmed.rfind('}')) {
-                if let Ok(decision) = serde_json::from_str::<serde_json::Value>(&trimmed[start..=end]) {
-                    if let Some(tool_name) = decision["tool"].as_str() {
+            if let (Some(start), Some(end)) = (trimmed.find('{'), trimmed.rfind('}'))
+                && start <= end
+                && let Ok(decision) = serde_json::from_str::<serde_json::Value>(&trimmed[start..=end])
+                    && let Some(tool_name) = decision["tool"].as_str() {
                         let args = &decision["args"];
                         println!("         -> Action authorized: Executing system tool '{}' with args: {}", tool_name, args);
                         let tool_res = match tool_name {
@@ -354,8 +359,6 @@ async fn handle_command_inner(
                             }
                         };
                     }
-                }
-            }
         }
     }
 
@@ -379,9 +382,10 @@ async fn handle_command_inner(
                 }
             }
 
-            if (trimmed.starts_with('{') || trimmed.starts_with("```json")) && trimmed.contains("search") {
-                if let (Some(start), Some(end)) = (trimmed.find('{'), trimmed.rfind('}')) {
-                    if let Ok(decision) = serde_json::from_str::<serde_json::Value>(&trimmed[start..=end]) {
+            if (trimmed.starts_with('{') || trimmed.starts_with("```json")) && trimmed.contains("search")
+                && let (Some(start), Some(end)) = (trimmed.find('{'), trimmed.rfind('}'))
+                && start <= end
+                    && let Ok(decision) = serde_json::from_str::<serde_json::Value>(&trimmed[start..=end]) {
                         let query = decision["args"]["query"].as_str().unwrap_or_default().to_string();
                         let enhanced_query = format!("{} in {} today {}", query, location, current_time);
                         println!("         -> Cloud requested live global search query: '{}'", enhanced_query);
@@ -403,8 +407,6 @@ async fn handle_command_inner(
                             }
                         };
                     }
-                }
-            }
             println!("   [3/3] Finalizing payload assembly...");
             Ok(resp)
         },
