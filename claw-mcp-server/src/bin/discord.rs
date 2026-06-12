@@ -109,7 +109,11 @@ impl EventHandler for Handler {
 
         let mut history = {
             let mut histories = self.histories.lock().await;
-            histories.entry(msg.author.id.get()).or_insert_with(Vec::new).clone()
+            let h = histories.entry(msg.author.id.get()).or_insert_with(Vec::new);
+            if h.len() > claw_mcp_server::agent::MAX_HISTORY {
+                h.drain(..h.len() - claw_mcp_server::agent::MAX_HISTORY);
+            }
+            h.clone()
         };
 
         // Wrap handle_command in task-local scope to collect diagnostics
@@ -218,8 +222,11 @@ async fn main() -> anyhow::Result<()> {
     let location = claw_mcp_server::agent::get_current_location().await;
 
     if config.ai_mode == "hybrid" {
-        let ollama_config = config.get_ai_config("ollama").unwrap();
-        let _ = ensure_ollama_setup(&ollama_config.default_model, ollama_config.base_url.as_deref()).await;
+        if let Some(ollama_config) = config.get_ai_config("ollama") {
+            let _ = ensure_ollama_setup(&ollama_config.default_model, ollama_config.base_url.as_deref()).await;
+        } else {
+            println!("[!] WARNING: 'ollama' configuration missing from sandbox_config.json in hybrid mode.");
+        }
     }
 
     let intents = GatewayIntents::GUILD_MESSAGES

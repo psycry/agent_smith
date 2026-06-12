@@ -36,7 +36,7 @@ pub async fn execute_command(config: &SandboxConfig, input: ExecuteCommandInput)
                 || c == '+'
         });
 
-        if !is_safe || arg.contains(';') || arg.contains('&') || arg.contains('|') || arg.contains('$') || arg.contains('`') || arg.contains('\n') || arg.contains('\r') {
+        if !is_safe {
             return Ok(CallToolResult::error(vec![Content::text("Argument validation failed: unauthorized characters in command arguments")]));
         }
     }

@@ -124,6 +124,20 @@ pub struct MoveFileInput {
     pub destination: String,
 }
 
+fn copy_dir_all(src: impl AsRef<std::path::Path>, dst: impl AsRef<std::path::Path>) -> std::io::Result<()> {
+    fs::create_dir_all(&dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_dir() {
+            copy_dir_all(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        } else {
+            fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        }
+    }
+    Ok(())
+}
+
 pub async fn move_file(config: &SandboxConfig, input: MoveFileInput) -> Result<CallToolResult> {
     if let Err(e) = validate_no_traversal(&input.source) {
         return Ok(e);
@@ -140,6 +154,14 @@ pub async fn move_file(config: &SandboxConfig, input: MoveFileInput) -> Result<C
         None => return Ok(CallToolResult::error(vec![Content::text("Path not allowed")])),
     };
     
-    fs::rename(safe_source, safe_destination)?;
+    if let Err(_) = fs::rename(&safe_source, &safe_destination) {
+        if safe_source.is_dir() {
+            copy_dir_all(&safe_source, &safe_destination)?;
+            fs::remove_dir_all(&safe_source)?;
+        } else {
+            fs::copy(&safe_source, &safe_destination)?;
+            fs::remove_file(&safe_source)?;
+        }
+    }
     Ok(CallToolResult::success(vec![Content::text("File/Directory moved successfully")]))
 }

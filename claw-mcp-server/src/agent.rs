@@ -1,7 +1,5 @@
 use std::io::{self, Write};
 use std::sync::Arc;
-use tokio;
-use serde_json;
 use std::process::Command;
 use chrono::Local;
 
@@ -46,7 +44,10 @@ pub fn get_local_semaphore() -> Arc<tokio::sync::Semaphore> {
 }
 
 pub async fn get_current_location() -> String {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new());
     if let Ok(res) = client.get("http://ip-api.com/json").send().await {
         if let Ok(json) = res.json::<serde_json::Value>().await {
             let city = json["city"].as_str().unwrap_or("Unknown City");
@@ -145,8 +146,10 @@ async fn handle_command_inner(
     location: &str
 ) -> anyhow::Result<String> {
     println!("\n   [GRID MONITOR] Processing instruction: '{}'", input);
-    let gemini_config = config.get_ai_config("gemini").unwrap();
-    let ollama_config = config.get_ai_config("ollama").unwrap();
+    let gemini_config = config.get_ai_config("gemini")
+        .ok_or_else(|| anyhow::anyhow!("AI Provider 'gemini' not configured in sandbox_config.json"))?;
+    let ollama_config = config.get_ai_config("ollama")
+        .ok_or_else(|| anyhow::anyhow!("AI Provider 'ollama' not configured in sandbox_config.json"))?;
     
     let gemini = CloudProvider::new(
         gemini_config.api_key.clone(),

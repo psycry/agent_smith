@@ -14,8 +14,11 @@ async fn main() -> anyhow::Result<()> {
     println!("--- Agent Smith (CLI) ---");
     
     if config.ai_mode == "hybrid" {
-        let ollama_config = config.get_ai_config("ollama").unwrap();
-        let _ = ensure_ollama_setup(&ollama_config.default_model, ollama_config.base_url.as_deref()).await;
+        if let Some(ollama_config) = config.get_ai_config("ollama") {
+            let _ = ensure_ollama_setup(&ollama_config.default_model, ollama_config.base_url.as_deref()).await;
+        } else {
+            println!("[!] WARNING: 'ollama' configuration missing from sandbox_config.json in hybrid mode.");
+        }
     }
 
     let location = claw_mcp_server::agent::get_current_location().await;
